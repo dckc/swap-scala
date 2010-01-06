@@ -7,11 +7,7 @@ package org.w3.swap.logicalsyntax
 sealed case class Term()
 case class Variable() extends Term
 case class FunctionSymbol()
-case class Apply(f: FunctionSymbol, terms: List[Term]) extends Term {
-  override def toString(): String = {
-    f.toString + "@" + terms.toString
-  }
-}
+case class Apply(f: FunctionSymbol, terms: List[Term]) extends Term
 
 /* make 0-ary function terms easier to use */
 object FunctionSymbol {
@@ -22,11 +18,7 @@ object FunctionSymbol {
 sealed case class Formula()
 case class TruthConstant(b: Boolean) extends Formula
 case class PredicateSymbol(name: String)
-case class Atom(p: PredicateSymbol, terms: List[Term]) extends Formula {
-  override def toString(): String = {
-    p.toString() + terms.toString()
-  }
-}
+case class Atom(p: PredicateSymbol, terms: List[Term]) extends Formula
 case class Equals(x: Term, y: Term) extends Formula
 case class Not(f: Formula) extends Formula
 case class And(f: Formula, g: Formula) extends Formula
