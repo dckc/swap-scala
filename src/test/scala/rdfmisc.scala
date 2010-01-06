@@ -5,10 +5,10 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 class Misc extends Spec with ShouldMatchers {
-  import rdf2004.AbstractSyntax
+  import AbstractSyntax.{triple, graph, graph0, add}
 
   describe("triples as atomic formulas") {
-    val t1 = AbstractSyntax.triple(URI("x:bob"),
+    val t1 = triple(URI("x:bob"),
 				   URI("x:name"),
 				   PlainLiteral("Bob"))
 
@@ -20,7 +20,23 @@ class Misc extends Spec with ShouldMatchers {
     }
 
     it ("should convert RDF triple Atoms to strings reasonably") {
-      (t1.toString()) should equal ("Atom(PredicateSymbol(holds),List(Apply(<x:bob>,List()), Apply(<x:name>,List()), Apply(PlainLiteral(Bob),List())))")
+      (t1.toString()) should equal ("Atom(R(holds,3),List(Apply(<x:bob>,List()), Apply(<x:name>,List()), Apply(PlainLiteral(Bob),List())))")
+    }
+  }
+
+  describe("graph building") {
+    val vhome = BlankNode("home", new AnyRef)
+    val tbob = URI("x:bob")
+    val phome = URI("x:home")
+    val pin = URI("x:in")
+    val ttexas = URI("x:Texas")
+
+    val graph = add(add(graph0, tbob, phome, vhome),
+		    vhome, pin, ttexas)
+
+    it ("should make a graph of 2 triples") {
+      (graph.toString()) should equal (
+	"Exists(_:home,And(Atom(R(holds,3),List(_:home, Apply(<x:in>,List()), Apply(<x:Texas>,List()))),And(Atom(R(holds,3),List(Apply(<x:bob>,List()), Apply(<x:home>,List()), _:home)),TruthConstant(true))))")
     }
   }
 }

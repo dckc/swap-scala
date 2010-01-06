@@ -6,8 +6,9 @@ package org.w3.swap.logicalsyntax
 /* cf http://en.wikipedia.org/wiki/First-order_logic#Terms */
 sealed case class Term()
 case class Variable() extends Term
-case class FunctionSymbol()
+case class FunctionSymbol(arity: Int)
 case class Apply(f: FunctionSymbol, terms: List[Term]) extends Term
+/* TODO: check f.arity vs terms.length */
 
 /* make 0-ary function terms easier to use */
 object FunctionSymbol {
@@ -17,8 +18,9 @@ object FunctionSymbol {
 /* http://en.wikipedia.org/wiki/First-order_logic#Formulas */
 sealed case class Formula()
 case class TruthConstant(b: Boolean) extends Formula
-case class PredicateSymbol(name: String)
-case class Atom(p: PredicateSymbol, terms: List[Term]) extends Formula
+case class PredicateSymbol(arity: Int)
+case class Atom(r: PredicateSymbol, terms: List[Term]) extends Formula
+/* TODO: check r.arity vs terms.length */
 case class Equals(x: Term, y: Term) extends Formula
 case class Not(f: Formula) extends Formula
 case class And(f: Formula, g: Formula) extends Formula
