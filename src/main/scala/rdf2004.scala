@@ -14,12 +14,12 @@ import org.w3.swap.logicalsyntax.{Formula, TruthConstant, Atom, And, Exists,
 case class URI(i: String) /* ISSUE: not every string makes a URI */
           /* ISSUE: actually closer to IRI; called RDFuri or something
 	   * in the spec */
-     extends FunctionSymbol {
+     extends FunctionSymbol(0) {
   override def toString(): String = {
     "<" + i + ">"
   }
 }
-sealed case class Literal() extends FunctionSymbol
+sealed case class Literal() extends FunctionSymbol(0)
 case class PlainLiteral(s: String) extends Literal
 case class Language(code: String) /* ISSUE: restricted to lang code syntax */
 case class Text(chars: String, lang: Language) extends Literal {
@@ -40,11 +40,14 @@ case class BlankNode(hint: String, id: AnyRef) extends Variable {
   }
 }
 
+case class R(name: String, override val arity: Int) extends
+  PredicateSymbol(arity)
+
 class SyntaxError(msg: String) extends Exception
 
 /* Formulas */
 object AbstractSyntax {
-  val holds = PredicateSymbol("holds")
+  val holds = R("holds", 3)
 
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) = {
@@ -95,10 +98,13 @@ object AbstractSyntax {
 
   val graph0 = TruthConstant(true)
 
-  def + (graph: Formula, s: Term, p: Term, o: Term): Formula = {
+  def add (graph: Formula, s: Term, p: Term, o: Term): Formula = {
     val t = triple(s, p, o)
-    val (vars, conjunction) = unquantify(graph)
-    quantify(And(t, conjunction), vars ++ Notation.variables(t))
+    if (graph == graph0) { t }
+    else {
+      val (vars, conjunction) = unquantify(graph)
+      quantify(And(t, conjunction), vars union Notation.variables(t))
+    }
   }
 
   /*

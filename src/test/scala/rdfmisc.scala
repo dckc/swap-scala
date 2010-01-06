@@ -36,7 +36,7 @@ class Misc extends Spec with ShouldMatchers {
 
     it ("should make a graph of 2 triples") {
       (graph.toString()) should equal (
-	"Exists(_:home,And(Atom(R(holds,3),List(_:home, Apply(<x:in>,List()), Apply(<x:Texas>,List()))),And(Atom(R(holds,3),List(Apply(<x:bob>,List()), Apply(<x:home>,List()), _:home)),TruthConstant(true))))")
+	"Exists(_:home,And(Atom(R(holds,3),List(_:home, Apply(<x:in>,List()), Apply(<x:Texas>,List()))),Atom(R(holds,3),List(Apply(<x:bob>,List()), Apply(<x:home>,List()), _:home))))")
     }
   }
 }
