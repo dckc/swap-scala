@@ -13,6 +13,11 @@ case class Apply(f: FunctionSymbol, terms: List[Term]) extends Term {
   }
 }
 
+/* make 0-ary function terms easier to use */
+object FunctionSymbol {
+  implicit def makeConstant(f: FunctionSymbol): Term = Apply(f, Nil)
+}
+
 /* http://en.wikipedia.org/wiki/First-order_logic#Formulas */
 sealed case class Formula()
 case class TruthConstant(b: Boolean) extends Formula

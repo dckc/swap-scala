@@ -46,8 +46,6 @@ class SyntaxError(msg: String) extends Exception
 object AbstractSyntax {
   val holds = PredicateSymbol("holds")
 
-  implicit def makeTerm(f: FunctionSymbol): Term = { Apply(f, Nil) }
-
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) = {
     p match {
@@ -109,3 +107,4 @@ object AbstractSyntax {
   def compare (x: Atom, y: Atom): Int = { x.hashCode().compare(y.hashCode()) }
 
 }
+
