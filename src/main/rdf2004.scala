@@ -2,9 +2,9 @@
  * RDF Abstract syntax as per 2004 Recommendation
  */
 
-package org.w3.rdf2004
+package org.w3.swap.rdf2004
 
-import logicalsyntax.{Formula, PredicateSymbol, Constant, Variable, variables}
+import org.w3.swap.logicalsyntax.{Formula, PredicateSymbol, Constant, Variable, variables}
 
 /* Terms */
 case class URI(i: String) /* ISSUE: not every string makes a URI */
@@ -17,17 +17,18 @@ case class URI(i: String) /* ISSUE: not every string makes a URI */
 }
 sealed case class Literal() extends FunctionSymbol
 case class PlainLiteral(s: String) extends Literal
-case class DatatypedLiteral(value: String, dt: URI) extends Literal {
-  override def toString(): String {
-    "'" + chars + "'^^<" + dt.i + ">"
-  }
-}
 case class Language(code: String) /* ISSUE: restricted to lang code syntax */
 case class Text(chars: String, lang: Language) extends Literal {
   override def toString(): String {
     "'" + chars + "'@" + lang.code
   }
 }
+case class DatatypedLiteral(value: String, dt: URI) extends Literal {
+  override def toString(): String {
+    "'" + chars + "'^^<" + dt.i + ">"
+  }
+}
+
 
 case class BlankNode(hint: String, id: AnyRef) extends Variable {
   override def toString(): String {
@@ -37,9 +38,9 @@ case class BlankNode(hint: String, id: AnyRef) extends Variable {
 
 /* Formulas */
 object AbstractSyntax {
-  val holds = new PredicateSymbol
+  val holds = PredicateSymbol("holds")
 
-  def uri(i: String): Term { Apply(URI(i), Nil) }
+  implicit def makeTerm(f: FunctionSymbol): Term { Apply(f, Nil) }
 
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) {

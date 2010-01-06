@@ -1,7 +1,7 @@
 /* Abstract syntax of logics such as First Order Logic
  * and Intuitionistic Logic */
 
-package org.w3.logicalsyntax
+package org.w3.swap.logicalsyntax
 
 /* cf http://en.wikipedia.org/wiki/First-order_logic#Terms */
 sealed case class Term
@@ -15,7 +15,7 @@ case class Apply(f: FunctionSymbol, terms: List[Term]) extends Term {
 /* http://en.wikipedia.org/wiki/First-order_logic#Formulas */
 sealed case class Formula
 case class TruthConstant(b: Boolean) extends Formula
-case class PredicateSymbol
+case class PredicateSymbol(name: String)
 case class Atom(p: PredicateSymbol, terms: List[Term]) extends Formula {
   override def toString(): String {
     p.toString() + terms.toString()

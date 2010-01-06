@@ -10,3 +10,7 @@ Goals
  * Influence Sandro's RDF2 thinking
  * Influence Pat Hayes's RDF semantics advocacy around "named graphs" and such
  * Implement N3Logic proof checking independent of cwm
+
+
+directory layout is a la sbt/maven
+http://code.google.com/p/simple-build-tool/wiki/Setup
