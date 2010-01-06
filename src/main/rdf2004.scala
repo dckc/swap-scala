@@ -2,6 +2,8 @@
  * RDF Abstract syntax as per 2004 Recommendation
  */
 
+package org.w3.rdf2004
+
 import logicalsyntax.{Formula, PredicateSymbol, Constant, Variable, variables}
 
 /* Terms */
@@ -37,6 +39,8 @@ case class BlankNode(hint: String, id: AnyRef) extends Variable {
 object AbstractSyntax {
   val holds = new PredicateSymbol
 
+  def uri(i: String): Term { Apply(URI(i), Nil) }
+
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) {
     p match {
@@ -57,7 +61,7 @@ object AbstractSyntax {
 
   def quantify(f: Formula, vars: List[Variable]): Formula {
     if (vars == Nil) { f }
-    else { quantify(Exists(vars.first(), f), vars.rest()) }
+    else { quantify(Exists(vars.head, f), vars.tail) }
   }
       
 
@@ -68,10 +72,10 @@ object AbstractSyntax {
       
       def conjoin(todo: List[Atom], done: Formula): Formula {
 	if (todo == Nil) { done }
-	else { conjoin(todo.rest, And(todo.first, done)) }
+	else { conjoin(todo.tail, And(todo.head, done)) }
       }
       
-      quantify(conjoin(sorted.rest, sorted.first), variables(triples))
+      quantify(conjoin(sorted.tail, sorted.head), variables(triples))
     }
   }
 
