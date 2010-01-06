@@ -1,0 +1,12 @@
+=============
+RDF Semantics
+=============
+
+This is a semantics for RDF using more traditional logical structures.
+
+Goals
+ * Influence EricP's scala SQL/SPARQL integration work
+ * Influence the Datagraph.org scala RDF work
+ * Influence Sandro's RDF2 thinking
+ * Influence Pat Hayes's RDF semantics advocacy around "named graphs" and such
+ * Implement N3Logic proof checking independent of cwm
