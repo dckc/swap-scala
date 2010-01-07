@@ -5,10 +5,9 @@
 
 package org.w3.swap.rdf2004
 
-import org.w3.swap.logicalsyntax.{Formula, Equal, Not, And, Exists,
+import org.w3.swap.logicalsyntax.{Formula, NotNil, And, Exists,
 				  Term, Apply, Variable,
-				  FunctionSymbol,
-				  Notation}
+				  FunctionSymbol}
 
 /* Terms */
 case class URI(i: String) /* ISSUE: not every string makes a URI */
@@ -45,17 +44,13 @@ case class F(name: String, override val arity: Int) extends
 
 class SyntaxError(msg: String) extends Exception
 
-object Vocabulary {
-  val nil: Term = URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil")
-}
-
 /* Formulas */
 object AbstractSyntax {
   val holds = F("holds", 3)
 
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) = {
-    def atom() = Not(Equal(Apply(holds, List(s, p, o)), Vocabulary.nil))
+    def atom() = NotNil(Apply(holds, List(s, p, o)))
 
     p match {
       case Apply(_: URI, Nil) =>
@@ -74,7 +69,7 @@ object AbstractSyntax {
     val vg = g.variables
 
     f match {
-      case Not(Equal(_, nil)) => {
+      case NotNil(_) => {
 	if (vg.isEmpty) { And(List(f, g)) }
 	else { Exists(vg, And(List(f, g))) }
       }

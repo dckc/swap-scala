@@ -4,7 +4,7 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 class LogicSyntax extends Spec with ShouldMatchers {
-  import logicalsyntax.{Formula, Equal, Not, And, Exists,
+  import logicalsyntax.{Formula, NotNil, And, Exists,
 			Variable, FunctionSymbol, Apply }
 
   case class V(name: String) extends Variable
@@ -15,12 +15,14 @@ class LogicSyntax extends Spec with ShouldMatchers {
 
   describe("logical formulas") {
     val f = Exists(List("x", "y"),
-		   And(List(Not(Equal("x", 2)),
-			    Equal("y", Apply(F("nil"), Nil)),
-			    Equal(2, Apply(F("sqrt"), List(4))) )) )
+		   And(List(NotNil("x"),
+			    NotNil("y"),
+			    NotNil(Apply(F("nil"), Nil)),
+			    NotNil(2),
+			    NotNil(Apply(F("sqrt"), List(4))) )) )
 
     it("should represent formulas"){
-      (f.toString()) should equal ("Exists(List(V(x), V(y)),And(List(Not(Equal(V(x),Apply(F(2),List()))), Equal(V(y),Apply(F(nil),List())), Equal(Apply(F(2),List()),Apply(F(sqrt),List(Apply(F(4),List())))))))")
+      (f.toString()) should equal ("Exists(List(V(x), V(y)),And(List(NotNil(V(x)), NotNil(V(y)), NotNil(Apply(F(nil),List())), NotNil(Apply(F(2),List())), NotNil(Apply(F(sqrt),List(Apply(F(4),List())))))))")
     }
 
     it("should find variables"){
@@ -40,7 +42,7 @@ class Misc extends Spec with ShouldMatchers {
 
     it ("should convert RDF triple Atoms to strings reasonably") {
       (t1.toString()) should equal (
-	"Not(Equal(Apply(F(holds,3),List(Apply(<x:bob>,List()), Apply(<x:name>,List()), Apply(PlainLiteral(Bob),List()))),Apply(<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil>,List())))"
+	"NotNil(Apply(F(holds,3),List(Apply(<x:bob>,List()), Apply(<x:name>,List()), Apply(PlainLiteral(Bob),List()))))"
       )
     }
 
@@ -63,7 +65,7 @@ class Misc extends Spec with ShouldMatchers {
 
     it ("should make a graph of 2 triples") {
       (graph.toString()) should equal (
-	"Exists(List(_:home),And(List(Not(Equal(Apply(F(holds,3),List(Apply(<x:bob>,List()), Apply(<x:home>,List()), _:home)),Apply(<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil>,List()))), Not(Equal(Apply(F(holds,3),List(_:home, Apply(<x:in>,List()), Apply(<x:Texas>,List()))),Apply(<http://www.w3.org/1999/02/22-rdf-syntax-ns#nil>,List()))))))"
+	"Exists(List(_:home),And(List(NotNil(Apply(F(holds,3),List(Apply(<x:bob>,List()), Apply(<x:home>,List()), _:home))), NotNil(Apply(F(holds,3),List(_:home, Apply(<x:in>,List()), Apply(<x:Texas>,List())))))))"
       )
     }
 

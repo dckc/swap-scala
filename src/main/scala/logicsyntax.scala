@@ -39,8 +39,7 @@ object FunctionSymbol {
 sealed abstract class Formula() {
   def variables(): List[Variable] = {
     this match {
-      case Equal(x, y) => x.variables().union(y.variables)
-      case Not(g) => g.variables
+      case NotNil(x) => x.variables()
       case And(fl) => fl.flatMap(fmla => fmla.variables).removeDuplicates
       case Exists(vl, g) => vl union g.variables
       case Forall(vl, g) => vl union g.variables
@@ -48,8 +47,7 @@ sealed abstract class Formula() {
   }
 }
 
-case class Equal(x: Term, y: Term) extends Formula
-case class Not(f: Formula) extends Formula
+case class NotNil(x: Term) extends Formula
 case class And(fmlas: List[Formula]) extends Formula
 
 /* TODO: consider skolemization */
@@ -66,8 +64,8 @@ case class Forall(vars: List[Variable], f: Formula) extends Formula
 // object bottom: Formula
 // perhaps def bottom(t) => Not(Equal(t, t))
 
-object Notation {
+//object Notation {
   // not needed yet, and certainly not tested:
   // def or(f: Formula, g: Formula) { Not(And(Not(f), Not(g))) }
   // def implies(f: Formula, g: Formula) { Not(And(Not(f), g)) }
-}
+//}

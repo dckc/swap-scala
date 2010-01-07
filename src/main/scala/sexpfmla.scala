@@ -3,9 +3,9 @@
 
 package org.w3.swap
 
-import logicalsyntax.{Formula, Equal, Not, And, Exists,
+import logicalsyntax.{Formula, NotNil, And, Exists,
 		      Term, Variable, Apply}
-import rdf2004.{BlankNode, URI, Vocabulary,
+import rdf2004.{BlankNode, URI,
 		PlainLiteral, DatatypedLiteral,
 		Text, Language}
 import SExp.fromList
@@ -13,7 +13,7 @@ import SExp.fromList
 object Walker {
   def fmlaSexp(f: Formula): SExp = {
     f match {
-      case Not(Equal(term, Vocabulary.nil)) => termSexp(term)
+      case NotNil(term) => termSexp(term)
       case And(fl) => List(Symbol("and")) ++ fl.map(fmlaSexp)
       case Exists(vl, g) =>
 	List("exists", vl.map(termSexp), fmlaSexp(g))
