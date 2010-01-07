@@ -71,5 +71,3 @@ object Notation {
   // def or(f: Formula, g: Formula) { Not(And(Not(f), Not(g))) }
   // def implies(f: Formula, g: Formula) { Not(And(Not(f), g)) }
 }
-
-

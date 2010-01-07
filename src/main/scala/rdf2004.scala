@@ -45,14 +45,17 @@ case class F(name: String, override val arity: Int) extends
 
 class SyntaxError(msg: String) extends Exception
 
+object Vocabulary {
+  val nil: Term = URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil")
+}
+
 /* Formulas */
 object AbstractSyntax {
   val holds = F("holds", 3)
-  val nil: Term = URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil")
 
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) = {
-    def atom() = Not(Equal(Apply(holds, List(s, p, o)), nil))
+    def atom() = Not(Equal(Apply(holds, List(s, p, o)), Vocabulary.nil))
 
     p match {
       case Apply(_: URI, Nil) =>

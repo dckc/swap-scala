@@ -46,7 +46,7 @@ class Misc extends Spec with ShouldMatchers {
 
     it ("should convert to S-Expression reasonably") {
       (fmlaSexp(t1).toString()) should equal (
-	"(not (equal (holds (x:bob) (x:name) 'Bob') (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil)))"
+	"(holds (x:bob) (x:name) 'Bob')"
       )
     }
   }
@@ -69,7 +69,7 @@ class Misc extends Spec with ShouldMatchers {
 
     it ("should convert to S-Expression reasonably") {
       (fmlaSexp(graph).toString()) should equal (
-	"(exists (?home1) (and (not (equal (holds (x:bob) (x:home) ?home1) (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil))) (not (equal (holds ?home1 (x:in) (x:Texas)) (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil)))))"
+	"(exists (?home1) (and (holds (x:bob) (x:home) ?home1) (holds ?home1 (x:in) (x:Texas))))"
       )
     }
 
@@ -80,7 +80,7 @@ class Misc extends Spec with ShouldMatchers {
 
     it ("should handle a bit larger graph") {
       (fmlaSexp(gmore).toString()) should equal (
-"(exists (?who2 ?home1) (and (not (equal (holds (x:bob) (x:home) ?home1) (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil))) (not (equal (holds ?home1 (x:in) (x:Texas)) (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil))) (not (equal (holds (x:bob) (x:friend) ?who2) (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil))) (not (equal (holds ?who2 (x:home) ?home1) (http://www.w3.org/1999/02/22-rdf-syntax-ns#nil)))))"
+	"(exists (?who2 ?home1) (and (holds (x:bob) (x:home) ?home1) (holds ?home1 (x:in) (x:Texas)) (holds (x:bob) (x:friend) ?who2) (holds ?who2 (x:home) ?home1)))"
       )
     }
 

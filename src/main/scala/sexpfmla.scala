@@ -3,21 +3,20 @@
 
 package org.w3.swap
 
-import logicalsyntax.{Formula, TruthConstant, Atom, And, Exists,
+import logicalsyntax.{Formula, Equal, Not, And, Exists,
 		      Term, Variable, Apply}
-import rdf2004.{BlankNode, URI, R, PlainLiteral, DatatypedLiteral,
+import rdf2004.{BlankNode, URI, Vocabulary,
+		PlainLiteral, DatatypedLiteral,
 		Text, Language}
 import SExp.fromList
 
 object Walker {
   def fmlaSexp(f: Formula): SExp = {
     f match {
-      case Exists(v, g) =>
-	List("exists", List(termSexp(v)), fmlaSexp(g))
-      case And(g, h) => List("and", fmlaSexp(g), fmlaSexp(h))
-      case Atom(R(name, _), terms) => Cons(Symbol(name),
-					   fromList(terms.map(termSexp)) )
-      case TruthConstant(true) => List("and")
+      case Not(Equal(term, Vocabulary.nil)) => termSexp(term)
+      case And(fl) => List(Symbol("and")) ++ fl.map(fmlaSexp)
+      case Exists(vl, g) =>
+	List("exists", vl.map(termSexp), fmlaSexp(g))
       case _ => List("non-rdf-2004-formula@@", f.toString())
     }
   }
@@ -33,6 +32,9 @@ object Walker {
 	List("text", "'" + c + "'", code)
       case Apply(DatatypedLiteral(s, URI(dt)), Nil) =>
 	List("data", "'" + s + "'", List(dt))
+
+      case Apply(holds, List(s, p, o)) =>
+	List("holds", termSexp(s), termSexp(p), termSexp(o))
 
       case _ => List("non-rdf-2004-term@@", t.toString())
     }
