@@ -19,7 +19,7 @@ case class URI(i: String) /* ISSUE: not every string makes a URI */
     "<" + i + ">"
   }
 }
-sealed case class Literal() extends FunctionSymbol(0)
+sealed abstract class Literal() extends FunctionSymbol(0)
 case class PlainLiteral(s: String) extends Literal
 case class Language(code: String) /* ISSUE: restricted to lang code syntax */
 case class Text(chars: String, lang: Language) extends Literal {
@@ -47,6 +47,9 @@ class SyntaxError(msg: String) extends Exception
 
 /* Formulas */
 object AbstractSyntax {
+  /* ISSUE: follow ACL2 in having = as the only relation symbol?
+   * i.e. use a (holds ...) -> T/NIL function rather than
+   * a holds predicate? This would get rid of TruthConstant() too. */
   val holds = R("holds", 3)
 
   /* checks well-formedness of Atoms */

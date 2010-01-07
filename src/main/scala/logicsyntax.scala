@@ -4,7 +4,7 @@
 package org.w3.swap.logicalsyntax
 
 /* cf http://en.wikipedia.org/wiki/First-order_logic#Terms */
-sealed case class Term()
+sealed abstract class Term()
 case class Variable() extends Term
 case class FunctionSymbol(arity: Int)
 case class Apply(f: FunctionSymbol, terms: List[Term]) extends Term
@@ -16,7 +16,7 @@ object FunctionSymbol {
 }
 
 /* http://en.wikipedia.org/wiki/First-order_logic#Formulas */
-sealed case class Formula()
+sealed abstract class Formula()
 case class TruthConstant(b: Boolean) extends Formula
 case class PredicateSymbol(arity: Int)
 case class Atom(r: PredicateSymbol, terms: List[Term]) extends Formula

@@ -9,16 +9,7 @@ class Misc extends Spec with ShouldMatchers {
   import Walker.{fmlaSexp, termSexp}
 
   describe("triples as atomic formulas") {
-    val t1 = triple(URI("x:bob"),
-				   URI("x:name"),
-				   PlainLiteral("Bob"))
-
-    it ("should make an atom out of uri, uri, plain literal") {
-      (t1 match {
-	case Atom(_, _) => true
-	case _ => false
-      }) should equal (true)
-    }
+    val t1 = triple(URI("x:bob"), URI("x:name"), PlainLiteral("Bob"))
 
     it ("should convert RDF triple Atoms to strings reasonably") {
       (t1.toString()) should equal ("Atom(R(holds,3),List(Apply(<x:bob>,List()), Apply(<x:name>,List()), Apply(PlainLiteral(Bob),List())))")
