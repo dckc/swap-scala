@@ -20,6 +20,14 @@ case class Symbol(name: String) extends SExp {
 
 object SExp {
   val nil = Symbol("nil")
+
   implicit def makeSymbol(n: String) = Symbol(n)
+
+  implicit def fromList(items: List[SExp]): SExp = {
+    if (items == List()) { nil }
+    else {
+      Cons(items.head, fromList(items.tail))
+    }
+  }
 }
 
