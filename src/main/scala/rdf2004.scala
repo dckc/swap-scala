@@ -1,11 +1,11 @@
 /*
  * RDF Abstract syntax as per 2004 Recommendation
+ * http://www.w3.org/TR/2004/REC-rdf-concepts-20040210/
  */
 
 package org.w3.swap.rdf2004
 
-import org.w3.swap.logicalsyntax.{Formula, TruthConstant, Atom, And, Exists,
-				  PredicateSymbol,
+import org.w3.swap.logicalsyntax.{Formula, Equal, Not, And, Exists,
 				  Term, Apply, Variable,
 				  FunctionSymbol,
 				  Notation}
@@ -40,80 +40,55 @@ case class BlankNode(hint: String, id: AnyRef) extends Variable {
   }
 }
 
-case class R(name: String, override val arity: Int) extends
-  PredicateSymbol(arity)
+case class F(name: String, override val arity: Int) extends
+  FunctionSymbol(arity)
 
 class SyntaxError(msg: String) extends Exception
 
 /* Formulas */
 object AbstractSyntax {
-  /* ISSUE: follow ACL2 in having = as the only relation symbol?
-   * i.e. use a (holds ...) -> T/NIL function rather than
-   * a holds predicate? This would get rid of TruthConstant() too. */
-  val holds = R("holds", 3)
+  val holds = F("holds", 3)
+  val nil: Term = URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil")
 
   /* checks well-formedness of Atoms */
   def triple(s: Term, p: Term, o: Term) = {
+    def atom() = Not(Equal(Apply(holds, List(s, p, o)), nil))
+
     p match {
       case Apply(_: URI, Nil) =>
 	s match {
 	  /* is there a scala syntax for folding 2 cases? */
-	  case BlankNode(_, _) => Atom(holds, List(s, p, o))
-	  case Apply(_: URI, Nil) => Atom(holds, List(s, p, o))
+	  case BlankNode(_, _) => atom()
+	  case Apply(_: URI, Nil) => atom()
 	  case _ => throw new SyntaxError("subject must be URI or Blank Node")
 	}
       case _ => throw new SyntaxError("predicate must be URI")
     }
   }
 
-  def variables(atoms: List[Atom]): List[Variable] = {
-    atoms.flatMap(a => Notation.variables(a))
-  }
+  def add (f: Formula, s: Term, p: Term, o: Term): Formula = {
+    val g = triple(s, p, o)
+    val vg = g.variables
 
-  def quantify(f: Formula, vars: List[Variable]): Formula = {
-    if (vars == Nil) { f }
-    else { quantify(Exists(vars.head, f), vars.tail) }
-  }
-
-  def unquantify(f: Formula): (List[Variable], Formula) = {
     f match {
-      case Exists(v, g) => {
-	val (rest, gg) = unquantify(g)
-	(v :: rest, gg)
+      case Not(Equal(_, nil)) => {
+	if (vg.isEmpty) { And(List(f, g)) }
+	else { Exists(vg, And(List(f, g))) }
       }
-      case _ => (List(), f)
-    }
-  }
-
-  def graph(triples: List[Atom]): Formula = {
-    if (triples == Nil) { TruthConstant(true) }
-    else {
-      val sorted = triples.sort((a, b) => (compare(a, b) <= 0))
-      
-      def conjoin(todo: List[Atom], done: Formula): Formula = {
-	if (todo == Nil) { done }
-	else { conjoin(todo.tail, And(todo.head, done)) }
+      case And(fl) => {
+	if (vg.isEmpty) { And(fl ++ List(g)) }
+	else { Exists(vg, And(fl ++ List(g))) }
       }
-      
-      quantify(conjoin(sorted.tail, sorted.head), variables(triples))
-    }
-  }
-
-  val graph0 = TruthConstant(true)
-
-  def add (graph: Formula, s: Term, p: Term, o: Term): Formula = {
-    val t = triple(s, p, o)
-    if (graph == graph0) { t }
-    else {
-      val (vars, conjunction) = unquantify(graph)
-      quantify(And(t, conjunction), vars union Notation.variables(t))
+      case Exists(vl, And(fl)) => {
+	Exists(vl union g.variables, And(fl ++ List(g)))
+      }
+      case _ => throw new SyntaxError("f must be an RDF 2004 formula")
     }
   }
 
   /*
    * ISSUE: keep the triples sorted for ease of graph comparison?
+   * use a Set rather than a list? (Set interface, ListSet impl)
    */
-  def compare (x: Atom, y: Atom): Int = { x.hashCode().compare(y.hashCode()) }
-
 }
 
