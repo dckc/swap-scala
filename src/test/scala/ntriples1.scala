@@ -37,12 +37,13 @@ class NTriplesMisc extends Spec with ShouldMatchers {
   }
 
   describe("NTriples parser") {
-    it("should grok simple n-triples") {
-      val p = new org.w3.swap.NTriples()
       val doc = """
 <data:bob> <data:home> _:somewhere .
 _:somewhere <data:in> <data:Texas> .
 """
+    it("should grok simple n-triples") {
+      val p = new NTriples()
+
       val fr = p.parseAll(p.ntriplesDoc, doc)
       (fr match {
 	case p.Success(f, _) => fmlaSexp(f).toString()
@@ -58,6 +59,14 @@ _:somewhere <data:in> <data:Texas> .
 	case _ => "FAIL"
       }) should equal ( "List(_:ID)" )
 
+    }
+
+    it("should have a decent API") {
+      val f = new NTriples().toFormula(doc)
+
+      (fmlaSexp(f).toString()) should equal(
+	"(exists (?IDsomewhere) (and (holds (data:bob) (data:home) ?IDsomewhere) (holds ?IDsomewhere (data:in) (data:Texas))))"
+      )
     }
   }
 }

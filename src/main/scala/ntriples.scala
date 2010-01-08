@@ -14,7 +14,7 @@ import rdf2004.{URI,
 		AbstractSyntax
 	      }
 
-sealed abstract class Token()
+class SyntaxError(msg: String) extends Exception
 
 class NTriples extends RegexParsers {
   /* turn off whitespace skipping? or just take newlines out? */
@@ -77,4 +77,11 @@ class NTriples extends RegexParsers {
   def dequote(str: String) = str.substring(1, str.length() - 1)
   def mkuri(str: String) = URI(dequote(str))
 
+  def toFormula(doc: String): Formula = {
+    this.parseAll(ntriplesDoc, doc) match {
+      case Success(f, _) => f
+      case Failure(msg, _) => throw new SyntaxError(msg)
+      case Error(msg, _) => throw new SyntaxError(msg)
+    }
+  }
 }
