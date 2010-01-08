@@ -52,49 +52,6 @@ case class Apply(sym: Symbol, terms: List[Term]) extends Application {
   override def args = terms
 }
 
-
-
-sealed abstract class Formula() {
-  def variables(): List[Variable] = {
-    this match {
-      case NotNil(x) => x.variables()
-      case And(fl) => fl.flatMap(fmla => fmla.variables)
-      case Exists(vl, g) => vl ++ g.variables
-      case Forall(vl, g) => vl ++ g.variables
-    }
-  }
-
-  def quote(): SExp = {
-    this match {
-      /* This sorta promotes terms to formulas, which is like ACL2.
-       * But *unlike* ACL2, (and ...) is a formula, not a term,
-       * and the formulas below it may be quantified. Hmm.*/
-      case NotNil(term) => term.quote()
-      case And(fl) => 'and :: fl.map(f => f.quote())
-      case Exists(vl, g) => List('exists,
-				 vl.removeDuplicates.map(t => t.quote()),
-				 g.quote())
-      case Forall(vl, g) => List('forall,
-				 vl.removeDuplicates.map(t => t.quote()),
-				 g.quote())
-    }
-  }
-}
-
-/* reifying Not(Equal(term, NIL)) in scala is tedious...
- * perhaps an abstract Atom class of formulas? */
-case class NotNil(x: Term) extends Formula
-
-case class And(fmlas: List[Formula]) extends Formula
-//object Notation {
-  // not needed yet, and certainly not tested:
-  // def or(f: Formula, g: Formula) { Not(And(Not(f), Not(g))) }
-  // def implies(f: Formula, g: Formula) { Not(And(Not(f), g)) }
-//}
-
-case class Exists(vars: List[Variable], f: Formula) extends Formula
-case class Forall(vars: List[Variable], f: Formula) extends Formula
-
 object Unifier {
   /*
    * Quick miniKanren-like code 
@@ -149,6 +106,49 @@ object Unifier {
     }
   }
 }
+
+
+
+sealed abstract class Formula() {
+  def variables(): List[Variable] = {
+    this match {
+      case NotNil(x) => x.variables()
+      case And(fl) => fl.flatMap(fmla => fmla.variables)
+      case Exists(vl, g) => vl ++ g.variables
+      case Forall(vl, g) => vl ++ g.variables
+    }
+  }
+
+  def quote(): SExp = {
+    this match {
+      /* This sorta promotes terms to formulas, which is like ACL2.
+       * But *unlike* ACL2, (and ...) is a formula, not a term,
+       * and the formulas below it may be quantified. Hmm.*/
+      case NotNil(term) => term.quote()
+      case And(fl) => 'and :: fl.map(f => f.quote())
+      case Exists(vl, g) => List('exists,
+				 vl.removeDuplicates.map(t => t.quote()),
+				 g.quote())
+      case Forall(vl, g) => List('forall,
+				 vl.removeDuplicates.map(t => t.quote()),
+				 g.quote())
+    }
+  }
+}
+
+/* reifying Not(Equal(term, NIL)) in scala is tedious...
+ * perhaps an abstract Atom class of formulas? */
+case class NotNil(x: Term) extends Formula
+
+case class And(fmlas: List[Formula]) extends Formula
+//object Notation {
+  // not needed yet, and certainly not tested:
+  // def or(f: Formula, g: Formula) { Not(And(Not(f), Not(g))) }
+  // def implies(f: Formula, g: Formula) { Not(And(Not(f), g)) }
+//}
+
+case class Exists(vars: List[Variable], f: Formula) extends Formula
+case class Forall(vars: List[Variable], f: Formula) extends Formula
 
 /* TODO: consider skolemization */
 /* look at defchoose in ACL2
