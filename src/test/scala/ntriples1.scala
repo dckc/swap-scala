@@ -57,7 +57,7 @@ _:somewhere <data:in> <data:Texas> .
       (fr match {
 	case p.Success(Exists(vl, _), _) => vl.toString()
 	case _ => "FAIL"
-      }) should equal ( "List(_:ID)" )
+      }) should equal ( "List(_:IDsomewhere)" )
 
     }
 

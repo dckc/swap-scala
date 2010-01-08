@@ -37,7 +37,7 @@ case class DatatypedLiteral(value: String, dt: URI) extends Literal {
 
 case class BlankNode(hint: String, id: AnyRef) extends Variable {
   override def toString(): String = {
-    "_:" + hint
+    "_:" + hint + id.toString()
   }
 }
 
