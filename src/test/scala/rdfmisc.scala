@@ -1,12 +1,13 @@
-package org.w3.swap.rdf2004
+package org.w3.swap
 
 import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
-class LogicSyntax extends Spec with ShouldMatchers {
-  import logicalsyntax.{Formula, NotNil, And, Exists,
-			Variable, FunctionSymbol, Apply }
+import logicalsyntax.{Formula, NotNil, And, Exists,
+		      Term, Variable, FunctionSymbol, Apply }
+import Walker.{fmlaSexp, termSexp}
 
+class LogicSyntax extends Spec with ShouldMatchers {
   case class V(name: String) extends Variable
   case class F(name: String) extends FunctionSymbol(0)
 
@@ -33,9 +34,9 @@ class LogicSyntax extends Spec with ShouldMatchers {
   }
 }
 
-class Misc extends Spec with ShouldMatchers {
-  import AbstractSyntax.{triple, add}
-  import Walker.{fmlaSexp, termSexp}
+class RDFSyntax extends Spec with ShouldMatchers {
+  import rdf2004.{BlankNode, URI, PlainLiteral}
+  import rdf2004.AbstractSyntax.{triple, add, holds}
 
   describe("triples as atomic formulas") {
     val t1 = triple(URI("x:bob"), URI("x:name"), PlainLiteral("Bob"))
@@ -53,12 +54,13 @@ class Misc extends Spec with ShouldMatchers {
     }
   }
 
+  val vhome = BlankNode("home", "1")
+  val tbob: Term = URI("x:bob")
+  val phome: Term = URI("x:home")
+  val pin: Term = URI("x:in")
+  val ttexas: Term = URI("x:Texas")
+
   describe("graph building") {
-    val vhome = BlankNode("home", "1")
-    val tbob = URI("x:bob")
-    val phome = URI("x:home")
-    val pin = URI("x:in")
-    val ttexas = URI("x:Texas")
 
     val graph = add(triple(tbob, phome, vhome),
 		    vhome, pin, ttexas)
@@ -86,5 +88,25 @@ class Misc extends Spec with ShouldMatchers {
       )
     }
 
+  }
+}
+
+class RDFSemantics extends Spec with ShouldMatchers {
+  import rdf2004.{BlankNode, URI, PlainLiteral}
+  import rdf2004.AbstractSyntax.holds
+  import logicalsyntax.Unifier.{unify}
+
+  val vhome = BlankNode("home", "1")
+  val tbob: Term = URI("x:bob")
+  val phome: Term = URI("x:home")
+  val pin: Term = URI("x:in")
+  val ttexas: Term = URI("x:Texas")
+
+  describe("Unification") {
+    val t1 = Apply(holds, List(tbob, phome, vhome))
+    val t2 = Apply(holds, List(tbob, phome, ttexas))
+    ( unify(t1, t2, Map()) ) should equal (
+      Some(Map(vhome -> ttexas))
+    )
   }
 }

@@ -69,3 +69,58 @@ case class Forall(vars: List[Variable], f: Formula) extends Formula
   // def or(f: Formula, g: Formula) { Not(And(Not(f), Not(g))) }
   // def implies(f: Formula, g: Formula) { Not(And(Not(f), g)) }
 //}
+
+object Unifier {
+  /*
+   * Quick miniKanren-like code 
+   * sokuza-kanren.scm,v 1.1 2006/05/10 23:12:41 oleg
+   * http://okmij.org/ftp/Scheme/sokuza-kanren.scm
+   *
+   * <- http://lambda-the-ultimate.org/node/1494
+   * By Ehud Lamm at 2006-05-22 08:15 
+   */
+
+  type Subst = Map[Variable, Term]
+
+  def lookup(t: Term, s:Subst): Term = {
+    t match {
+      case Apply(_, _) => t
+      case v: Variable => {
+	s.get(v) match {
+	  case None => t
+	  case Some(b) => lookup(b, s)
+	}
+      }
+    }
+  }
+
+  def unify(tt1: Term, tt2: Term, s: Subst): Option[Subst] = {
+    val t1 = lookup(tt1, s)
+    val t2 = lookup(tt2, s)
+    if (t1 eq t2) Some(s)
+    else t1 match {
+      case v1: Variable => Some(s + (v1 -> t2))
+      case Apply(f1, args1) => t2 match {
+	case v2: Variable => Some(s + (v2 -> t1))
+	case Apply(f2, args2) => {
+	  if (f1 == f2) unifyall(args1, args2, s)
+	  else None
+	}
+      }
+    }
+  }
+
+  def unifyall(tl1: List[Term], tl2: List[Term], s: Subst): Option[Subst] = {
+    (tl1, tl2) match {
+      case (Nil, Nil) => Some(s)
+      case (Nil, _) => None
+      case (_, Nil) => None
+      case (head1 :: tail1, head2 :: tail2) => {
+	unify(head1, head2, s) match {
+	  case None => None
+	  case Some(ss) => unifyall(tail1, tail2, ss)
+	}
+      }
+    }
+  }
+}
