@@ -4,87 +4,87 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 import logicalsyntax.{Formula, NotNil, And, Exists,
-		      Term, Variable, FunctionSymbol, Apply }
-import Walker.{fmlaSexp, termSexp}
+		      Term, Variable, Literal, Apply }
 
 class LogicSyntax extends Spec with ShouldMatchers {
-  case class V(name: String) extends Variable
-  case class F(name: String) extends FunctionSymbol(0)
+  case class V(n: Symbol) extends Variable {
+    override def name = n
+  }
 
-  implicit def mkv(n: String) = V(n)
-  implicit def mkn(n: Int) = Apply(F(n.toString()), Nil)
+  implicit def mkv(n: Symbol): Variable = V(n)
+  implicit def mkn(n: Int): Term = Literal(n)
 
   describe("logical formulas") {
-    val f = Exists(List("x", "y"),
-		   And(List(NotNil("x"),
-			    NotNil("y"),
-			    NotNil(Apply(F("nil"), Nil)),
+    val f = Exists(List('x, 'y),
+		   And(List(NotNil('x),
+			    NotNil('y),
+			    NotNil(Apply('nil, Nil)),
 			    NotNil(2),
-			    NotNil(Apply(F("sqrt"), List(4))) )) )
+			    NotNil(Apply('sqrt, List(4))) )) )
 
     it("should represent formulas"){
-      (f.toString()) should equal ("Exists(List(V(x), V(y)),And(List(NotNil(V(x)), NotNil(V(y)), NotNil(Apply(F(nil),List())), NotNil(Apply(F(2),List())), NotNil(Apply(F(sqrt),List(Apply(F(4),List())))))))")
+      (f.toString()) should equal ("Exists(List(V('x), V('y)),And(List(NotNil(V('x)), NotNil(V('y)), NotNil(Apply('nil,List())), NotNil(Literal(2)), NotNil(Apply('sqrt,List(Literal(4)))))))")
     }
 
     it("should find variables"){
-      (f.variables) should equal (
-	List(V("x"), V("y"))
+      (f.variables.removeDuplicates) should equal (
+	List(V('x), V('y))
       )
     }
   }
 }
 
 class RDFSyntax extends Spec with ShouldMatchers {
-  import rdf2004.{BlankNode, URI, PlainLiteral}
-  import rdf2004.AbstractSyntax.{triple, add, holds}
+  import rdf2004.{BlankNode, URI}
+  import rdf2004.AbstractSyntax.{atom, add, plain}
 
   describe("triples as atomic formulas") {
-    val t1 = triple(URI("x:bob"), URI("x:name"), PlainLiteral("Bob"))
+    val t1 = atom(URI("data:bob"), URI("data:name"), plain("Bob"))
 
     it ("should convert RDF triple Atoms to strings reasonably") {
       (t1.toString()) should equal (
-	"NotNil(Apply(F(holds,3),List(Apply(<x:bob>,List()), Apply(<x:name>,List()), Apply(PlainLiteral(Bob),List()))))"
+	"NotNil(Apply('holds,List(URI(data:bob), URI(data:name), Literal(Bob))))"
       )
     }
 
     it ("should convert to S-Expression reasonably") {
-      (fmlaSexp(t1).toString()) should equal (
-	"(holds (x:bob) (x:name) 'Bob')"
+      (t1.quote().print()) should equal (
+	"(holds (data:bob) (data:name) '\"Bob\")"
       )
     }
   }
 
-  val vhome = BlankNode("home", "1")
-  val tbob: Term = URI("x:bob")
-  val phome: Term = URI("x:home")
-  val pin: Term = URI("x:in")
-  val ttexas: Term = URI("x:Texas")
+  val vhome = BlankNode("_:home", Some(1))
+  val tbob: Term = URI("data:bob")
+  val phome: Term = URI("data:home")
+  val pin: Term = URI("data:in")
+  val ttexas: Term = URI("data:Texas")
 
   describe("graph building") {
 
-    val graph = add(triple(tbob, phome, vhome),
+    val graph = add(atom(tbob, phome, vhome),
 		    vhome, pin, ttexas)
 
     it ("should make a graph of 2 triples") {
       (graph.toString()) should equal (
-	"Exists(List(_:home1),And(List(NotNil(Apply(F(holds,3),List(Apply(<x:bob>,List()), Apply(<x:home>,List()), _:home1))), NotNil(Apply(F(holds,3),List(_:home1, Apply(<x:in>,List()), Apply(<x:Texas>,List())))))))"
+	"Exists(List(BlankNode(_:home,Some(1))),And(List(NotNil(Apply('holds,List(URI(data:bob), URI(data:home), BlankNode(_:home,Some(1))))), NotNil(Apply('holds,List(BlankNode(_:home,Some(1)), URI(data:in), URI(data:Texas)))))))"
       )
     }
 
     it ("should convert to S-Expression reasonably") {
-      (fmlaSexp(graph).toString()) should equal (
-	"(exists (?home1) (and (holds (x:bob) (x:home) ?home1) (holds ?home1 (x:in) (x:Texas))))"
+      (graph.quote().print()) should equal (
+	"(exists (_:home.1) (and (holds (data:bob) (data:home) _:home.1) (holds _:home.1 (data:in) (data:Texas))))"
       )
     }
 
-    val vwho = BlankNode("who", "2")
+    val vwho = BlankNode("who", Some(2))
     val gmore = add(add(graph,
-			tbob, URI("x:friend"), vwho),
+			tbob, URI("data:friend"), vwho),
 		    vwho, phome, vhome)
 
     it ("should handle a bit larger graph") {
-      (fmlaSexp(gmore).toString()) should equal (
-	"(exists (?who2 ?home1) (and (holds (x:bob) (x:home) ?home1) (holds ?home1 (x:in) (x:Texas)) (holds (x:bob) (x:friend) ?who2) (holds ?who2 (x:home) ?home1)))"
+      (gmore.quote().print()) should equal (
+	"(exists (who.2 _:home.1) (and (holds (data:bob) (data:home) _:home.1) (holds _:home.1 (data:in) (data:Texas)) (holds (data:bob) (data:friend) who.2) (holds who.2 (data:home) _:home.1)))"
       )
     }
 
@@ -92,20 +92,20 @@ class RDFSyntax extends Spec with ShouldMatchers {
 }
 
 class RDFSemantics extends Spec with ShouldMatchers {
-  import rdf2004.{BlankNode, URI, PlainLiteral}
-  import rdf2004.AbstractSyntax.holds
+  import rdf2004.{BlankNode, URI}
+  import rdf2004.AbstractSyntax.{plain}
   import rdf2004.Semantics.entails
   import logicalsyntax.Unifier.{unify}
 
-  val vhome = BlankNode("home", "1")
-  val tbob: Term = URI("x:bob")
-  val phome: Term = URI("x:home")
-  val pin: Term = URI("x:in")
-  val ttexas: Term = URI("x:Texas")
+  val vhome = BlankNode("home", Some(1))
+  val tbob: Term = URI("data:bob")
+  val phome: Term = URI("data:home")
+  val pin: Term = URI("data:in")
+  val ttexas: Term = URI("data:Texas")
 
   describe("Unification") {
-    val t1 = Apply(holds, List(tbob, phome, vhome))
-    val t2 = Apply(holds, List(tbob, phome, ttexas))
+    val t1 = Apply('holds, List(tbob, phome, vhome))
+    val t2 = Apply('holds, List(tbob, phome, ttexas))
     ( unify(t1, t2, Map()) ) should equal (
       Some(Map(vhome -> ttexas))
     )

@@ -4,10 +4,9 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 class NTriplesMisc extends Spec with ShouldMatchers {
-  import Walker.fmlaSexp
-  import rdf2004.{BlankNode, AbstractSyntax, URI}
-  import logicalsyntax.{And, FunctionSymbol, Exists}
-  val triple = AbstractSyntax.triple _
+  import rdf2004.{BlankNode, URI}
+  import rdf2004.AbstractSyntax.atom
+  import logicalsyntax.{And, Exists}
 
   describe("substring preliminary") {
     it("never mind") {
@@ -18,21 +17,22 @@ class NTriplesMisc extends Spec with ShouldMatchers {
   describe("NTriples blank nodes") {
 
     it("should match by name"){
-      val vars = List(BlankNode("", "abc".intern()),
-		      BlankNode("", "<abc>".substring(1,4).intern()) )
+      val vars = List(BlankNode("", Some("abc".intern())),
+		      BlankNode("", Some("<abc>".substring(1,4).intern())) )
 
       (vars.removeDuplicates.length) should equal(1)
     }
   }
 
   describe("Formula.variables()") {
-    it("should remove dups"){
-      val v1 = BlankNode("", "abc".intern())
-      val v2 = BlankNode("", "<abc>".substring(1,4).intern())
-      val f = And(List(triple(URI("data:s1"), URI("data:p"), v1),
-		       triple(URI("data:s2"), URI("data:p"), v2) ))
-      (f.variables()) should equal (List(v1))
-      (f.variables()) should equal (List(v1, v2).removeDuplicates)
+    it("should expect caller to remove dups"){
+      val v1 = BlankNode("", Some("abc".intern()))
+      val v2 = BlankNode("", Some("<abc>".substring(1,4).intern()))
+      val f = And(List(atom(URI("data:s1"), URI("data:p"), v1),
+		       atom(URI("data:s2"), URI("data:p"), v2) ))
+      (f.variables().removeDuplicates) should equal (List(v1))
+      (f.variables().removeDuplicates) should equal (
+	List(v1, v2).removeDuplicates)
     }
   }
 
@@ -46,26 +46,25 @@ _:somewhere <data:in> <data:Texas> .
 
       val fr = p.parseAll(p.ntriplesDoc, doc)
       (fr match {
-	case p.Success(f, _) => fmlaSexp(f).toString()
+	case p.Success(f, _) => f.quote().print()
 	case p.Failure(msg, _) => msg
 	case p.Error(msg, _) => msg
       }) should equal (
-	/* @@DUP vars! */
-	"(exists (?IDsomewhere) (and (holds (data:bob) (data:home) ?IDsomewhere) (holds ?IDsomewhere (data:in) (data:Texas))))"
+	"(exists (_:somewhere) (and (holds (data:bob) (data:home) _:somewhere) (holds _:somewhere (data:in) (data:Texas))))"
       )
 
       (fr match {
 	case p.Success(Exists(vl, _), _) => vl.toString()
 	case _ => "FAIL"
-      }) should equal ( "List(_:IDsomewhere)" )
+      }) should equal ( "List(BlankNode(_:somewhere,None))" )
 
     }
 
     it("should have a decent API") {
       val f = new NTriples().toFormula(doc)
 
-      (fmlaSexp(f).toString()) should equal(
-	"(exists (?IDsomewhere) (and (holds (data:bob) (data:home) ?IDsomewhere) (holds ?IDsomewhere (data:in) (data:Texas))))"
+      (f.quote().print()) should equal(
+	"(exists (_:somewhere) (and (holds (data:bob) (data:home) _:somewhere) (holds _:somewhere (data:in) (data:Texas))))"
       )
     }
   }

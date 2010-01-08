@@ -6,13 +6,9 @@ package org.w3.swap
 
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
-import logicalsyntax.{Formula, And, Exists, Term, FunctionSymbol}
-import rdf2004.{URI,
-		BlankNode,
-		PlainLiteral, DatatypedLiteral,
-		Text, Language,
-		AbstractSyntax
-	      }
+import logicalsyntax.{Formula, And, Exists, Term}
+import rdf2004.{URI,BlankNode}
+import rdf2004.AbstractSyntax.{plain, data, text, atom}
 
 class SyntaxError(msg: String) extends Exception
 
@@ -22,15 +18,10 @@ class NTriples extends RegexParsers {
 
   def ntriplesDoc: Parser[Formula] = rep(line) ^^ {
     case List() => And(List())
-    case List(f) => {
-      val vars = f.variables
-      if (vars.isEmpty) { f }
-      else { Exists(vars, f) }
-    }
     case atoms => {
-      val vars = atoms.flatMap(f => f.variables).removeDuplicates
+      val vars = atoms.flatMap(f => f.variables)
       if (vars.isEmpty) { And(atoms) }
-      else { Exists(vars, And(atoms)) }
+      else { Exists(vars.removeDuplicates, And(atoms)) }
     }
   }
 
@@ -38,7 +29,7 @@ class NTriples extends RegexParsers {
   def line: Parser[Formula] = triple
 
   def triple: Parser[Formula] = subject ~ predicate ~ objectt <~ "." ^^ {
-    case s~p~o => AbstractSyntax.triple(s, p, o)
+    case s~p~o => atom(s, p, o)
   }
 
   def subject: Parser[Term] = uriref | nodeID
@@ -55,27 +46,29 @@ class NTriples extends RegexParsers {
   def nodeID: Parser[Term] = "_:[A-Za-z][A-Za-z0-9]*".r ^^ {
     case str => {
       val n = str.substring(2).intern()
-      BlankNode("ID", n)
+      BlankNode("_:" + n, None)
     }
   }
 
   def literal: Parser[Term] = langString | datatypeString
 
   def langString: Parser[Term] =
+    /* technically, this would allow spaces around the @ */
     "\"[^\"]+\"".r ~ opt("@" ~> "[a-z]+(-[a-z0-9]+)*".r) ^^ {
-      case str ~ None => PlainLiteral(dequote(str))
-      case str ~ Some(code) => Text(dequote(str), Language(code))
+      case str ~ None => plain(dequote(str))
+      case str ~ Some(code) => text(dequote(str), code)
     }
 
   def datatypeString: Parser[Term] =
+    /* technically, this would allow spaces around the ^^ */
     "\"[^\"]+\"".r ~ "^^" ~ "<[^>]+>".r ^^ {
-      case value ~ _ ~ dt => DatatypedLiteral(value, mkuri(dt))
+      case value ~ _ ~ dt => data(value, mkuri(dt))
     }
 
   /* why can't I move these methods to an object? */
   /* TODO: escapes */
   def dequote(str: String) = str.substring(1, str.length() - 1)
-  def mkuri(str: String) = URI(dequote(str))
+  def mkuri(str: String) = new URI(dequote(str))
 
   def toFormula(doc: String): Formula = {
     this.parseAll(ntriplesDoc, doc) match {

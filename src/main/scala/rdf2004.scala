@@ -6,68 +6,61 @@
 package org.w3.swap.rdf2004
 
 import org.w3.swap.logicalsyntax.{Formula, NotNil, And, Exists,
-				  Term, Apply, Variable,
-				  FunctionSymbol,
+				  Term, Variable,
+				  Application, Apply, Literal,
 				  Unifier
 				}
 
 /* Terms */
-case class URI(i: String) /* ISSUE: not every string makes a URI */
-          /* ISSUE: actually closer to IRI; called RDFuri or something
-	   * in the spec */
-     extends FunctionSymbol(0) {
-  override def toString(): String = {
-    "<" + i + ">"
-  }
-}
-sealed abstract class Literal() extends FunctionSymbol(0)
-case class PlainLiteral(s: String) extends Literal
-case class Language(code: String) /* ISSUE: restricted to lang code syntax */
-case class Text(chars: String, lang: Language) extends Literal {
-  override def toString(): String = {
-    "'" + chars + "'@" + lang.code
-  }
-}
-case class DatatypedLiteral(value: String, dt: URI) extends Literal {
-  override def toString(): String = {
-    "'" + value + "'^^<" + dt.i + ">"
-  }
+case class URI(val i: String) extends Application {
+  /* ISSUE: not every string makes a URI */
+  /* ISSUE: actually closer to IRI; called RDFuri or something
+   * in the spec */
+  override def fun = Symbol(i)
+  override def args = Nil
 }
 
-
-case class BlankNode(hint: String, id: AnyRef) extends Variable {
-  override def toString(): String = {
-    "_:" + hint + id.toString()
+case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
+  override def name: Symbol = {
+    qual match {
+      case None => Symbol(n)
+      case Some(x) => Symbol(n + "." + x.toString())
+    }
   }
 }
-
-case class F(name: String, override val arity: Int) extends
-  FunctionSymbol(arity)
 
 class SyntaxError(msg: String) extends Exception
 
 /* Formulas */
 object AbstractSyntax {
-  val holds = F("holds", 3)
+  def plain(s: String): Term = Literal(s)
+  def text(s: String, code: String): Term = Apply('text,
+						  List(Literal(code),
+						       Literal(s)))
+  def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
+  def xml(lex: String): Term = Apply('xml, List(Literal(lex)))
 
   /* checks well-formedness of Atoms */
-  def triple(s: Term, p: Term, o: Term) = {
-    def atom() = NotNil(Apply(holds, List(s, p, o)))
+  def atom(s: Term, p: Term, o: Term) = {
+    /* scalaQ: use lazy value instead of def? */
+    def atom() = NotNil(Apply('holds, List(s, p, o)))
 
     p match {
-      case Apply(_: URI, Nil) =>
+      case URI(_) =>
 	s match {
 	  /* is there a scala syntax for folding 2 cases? */
 	  case BlankNode(_, _) => atom()
-	  case Apply(_: URI, Nil) => atom()
+	  case URI(_) => atom()
 	  case _ => throw new SyntaxError("subject must be URI or Blank Node")
 	}
       case _ => throw new SyntaxError("predicate must be URI")
     }
   }
 
+  /* preserves normal form
+   * preserves order of Atoms in And() */
   def add (f: Formula, s: Term, p: Term, o: Term): Formula = {
-    val g = triple(s, p, o)
+    val g = atom(s, p, o)
     val vg = g.variables
 
     f match {
@@ -80,11 +73,15 @@ object AbstractSyntax {
 	else { Exists(vg, And(fl ++ List(g))) }
       }
       case Exists(vl, And(fl)) => {
-	Exists(vl union g.variables, And(fl ++ List(g)))
+	Exists(vl ++ g.variables, And(fl ++ List(g)))
       }
       case _ => throw new SyntaxError("f must be an RDF 2004 formula")
     }
   }
+
+  /*
+   * TODO: wff() checker, normalize()
+   */
 
   /*
    * ISSUE: keep the triples sorted for ease of graph comparison?
