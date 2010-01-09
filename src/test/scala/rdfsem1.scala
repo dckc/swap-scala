@@ -13,27 +13,51 @@ import Arbitrary.arbitrary
 import org.w3.swap.NTriples
 
 object ntp extends Properties("NTriples parsing") {
+  val genConst = Gen.oneOf("<data:bob>",
+			   "<data:dan>",
+			   "\"str1\"",
+			   "\"str2\"")
 
+  val gen3 = for {
+    s <- genConst
+    p <- genConst
+    o <- genConst
+  } yield (s, p, o)
+
+  val genLines = for {
+    l <- Gen.choose(3, 15)
+    v <- Gen.vectorOf(l, gen3)
+  } yield v
+
+  property("Nilsson - str - 3tup") = Prop.forAll(genLines){
+    lines => {
+      val l = lines.map(t => t._1 + " " + t._2 + " " + t._3 + ".")
+      /* no list.join("\n") in the Scala lib? */
+      val doc = l.foldLeft("")((s1, s2) => s1 + "\n" + s2)
+      // println(doc)
+      true
+    }
+  }
+
+  /*
+  property("explore") = forAll((s: String) => false )
+
+  implicit val arbString = Arbitrary(genConstant)
+
+  */
+
+/*********
   property ("ground doc") = forAll(genDoc) {
     doc => false
 //    doc =>
 //      new NTriples().toFormula(doc).variables().isEmpty
   }
 
-  val genConstant = Gen.oneOf("<data:bob>",
-			      "<data:dan>",
-			      "\"str1\"",
-			      "\"str2\"")
   val genVar = for {
     i <- arbitrary[Int]
   } yield "_:v" + i.toString()
 
-  val genLine1 = for {
-    s <- genConstant
-    p <- genConstant
-    o <- genConstant
-  } yield s + " " + p + " " + o + ".\n"
 
   def genDoc = genLine1
-
+********/
 }
