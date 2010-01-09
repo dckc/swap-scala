@@ -6,7 +6,12 @@
  */
 import sbt.{ProjectInfo, DefaultProject}
 
-class ScalaTestProject(info: ProjectInfo) extends DefaultProject(info)
+class TestingProject(info: ProjectInfo) extends DefaultProject(info)
 {
   val scalatest = "org.scalatest" % "scalatest" % "0.9.5" % "test->default"
+
+  // per http://code.google.com/p/scalacheck/
+// 1.6 isn't in the maven repo :-/
+//  val scalacheck = "org.scalacheck" % "scalacheck" % "1.6" % "test->default"
+//  val toolsrep = "Scala-Tools Repo" at "http://scala-tools.org"
 }

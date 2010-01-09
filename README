@@ -14,3 +14,6 @@ Goals
 
 directory layout is a la sbt/maven
 http://code.google.com/p/simple-build-tool/wiki/Setup
+
+see project/build/rdfsem.scala for dependency info (i.e. sbt config)
+
