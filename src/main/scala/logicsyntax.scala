@@ -193,6 +193,8 @@ sealed abstract class Formula() {
 				 g.quote())
     }
   }
+
+  override def toString(): String = this.quote().print()
 }
 
 /* reifying Not(Equal(term, NIL)) in scala is tedious...

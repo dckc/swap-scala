@@ -23,7 +23,7 @@ class LogicSyntax extends Spec with ShouldMatchers {
 			    NotNil(Apply('sqrt, List(4))) )) )
 
     it("should represent formulas"){
-      (f.toString()) should equal ("Exists(List(V('x), V('y)),And(List(NotNil(V('x)), NotNil(V('y)), NotNil(Apply('nil,List())), NotNil(Literal(2)), NotNil(Apply('sqrt,List(Literal(4)))))))")
+      (f.toString()) should equal ("(exists (x y) (and x y (nil) '2 (sqrt '4)))")
     }
 
     it("should find variables"){
@@ -43,7 +43,7 @@ class RDFSyntax extends Spec with ShouldMatchers {
 
     it ("should convert RDF triple Atoms to strings reasonably") {
       (t1.toString()) should equal (
-	"NotNil(Apply('holds,List(URI(data:bob), URI(data:name), Literal(Bob))))"
+	"(holds (data:bob) (data:name) '\"Bob\")"
       )
     }
 
@@ -67,7 +67,7 @@ class RDFSyntax extends Spec with ShouldMatchers {
 
     it ("should make a graph of 2 triples") {
       (graph.toString()) should equal (
-	"Exists(List(BlankNode(_:home,Some(1))),And(List(NotNil(Apply('holds,List(URI(data:bob), URI(data:home), BlankNode(_:home,Some(1))))), NotNil(Apply('holds,List(BlankNode(_:home,Some(1)), URI(data:in), URI(data:Texas)))))))"
+	"(exists (_:home.1) (and (holds (data:bob) (data:home) _:home.1) (holds _:home.1 (data:in) (data:Texas))))"
       )
     }
 

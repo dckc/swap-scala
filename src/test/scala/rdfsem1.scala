@@ -10,11 +10,92 @@ import Arbitrary.arbitrary
 /* cf http://code.google.com/p/scalacheck/
  */
 
-import org.w3.swap.NTriples
-import org.w3.swap.SyntaxError
+
 import org.w3.swap.rdf2004.AbstractSyntax.wellformed
 
+object ent extends Properties("RDF 2004 Entailment") {
+  import org.w3.swap.logicalsyntax.{Formula, And}
+  import org.w3.swap.rdf2004.{URI, BlankNode}
+  import org.w3.swap.rdf2004.AbstractSyntax.{plain, text, data, checkterm, add}
+  import org.w3.swap.rdf2004.Semantics.entails
+
+  val genVar = for {
+    n <- Gen.choose(1, 3)
+  } yield BlankNode("_:v", Some(n))
+
+  val genURI = for {
+/* pruning... having trouble finding interesting cases for transitivity.
+
+    scheme <- Gen.oneOf("http:", "data:", "ftp:", "mailto:")
+    auth <- Gen.oneOf("//x.example", "//y.example", "//z.example", "")
+*/
+    path <- Gen.oneOf("/a", "bob@example")
+    frag <- Gen.oneOf("", "#date")
+  } yield URI("data:" + path + frag)
+
+  val genLiteral = Gen.oneOf(plain("abc"),
+			     data("2006-01-01", URI("<data:#date>")), 
+			     text("chat", "fr") )
+
+  val genSPO = for {
+    s <- Gen.oneOf(genVar, genURI)
+    p <- genURI
+    o <- Gen.oneOf(genVar, genURI, genLiteral)
+  } yield (s, p, o)
+
+  val genGraph = for {
+    size <- Gen.frequency(
+      (1, 0),
+      (10, 1),
+      (5, 2),
+      (2, 3)
+      /*
+      (5, 4),
+      (5, 5),
+      (2, 6)
+      */
+    )
+    arcs <- Gen.listOfN(size, genSPO)
+  } yield arcs.foldLeft(And(List()): Formula)(
+    (f, spo) => add(f, spo._1, spo._2, spo._3) )
+
+  implicit val arbf: Arbitrary[Formula] = Arbitrary(genGraph)
+
+  property("graphs are well formed") = Prop.forAll((g: Formula) =>
+    wellformed(g)
+  )
+
+  /********
+  val genFG = for {
+    f <- genGraph
+    g <- genGraph
+  } yield (f, g)
+
+  val genEntailment = genFG suchThat (fg => entails(fg._1, fg._2) )
+
+  val genFGH = for {
+    fg <- genEntailment
+    h <- genGraph
+  } yield (fg._1, fg._2, h)
+  ********* */
+
+  property("entailment is transitive") =
+    Prop.forAll( (f: Formula, g: Formula, h: Formula) =>
+      (entails(f, g) && entails(g, h)) ==> {
+	/*
+	println("f |= g and g |= h. does f |= h?")
+	println (f)
+	println (g)
+	println (h)
+	*/ 
+	entails(f, h)
+      }
+   )
+}
+
 object ntp extends Properties("NTriples parsing") {
+  import org.w3.swap.NTriples
+  import org.w3.swap.SyntaxError
 
   val genSubj = Gen.oneOf("<data:bob>", "<data:dan>",
 			  "_:x", "_:y", "_:z")
@@ -42,7 +123,7 @@ object ntp extends Properties("NTriples parsing") {
     val l = lines.map(t => t._1 + " " + t._2 + " " + t._3 + ".")
 
     /* scalaQ: no list.join("\n") in the Scala lib? */
-    l.foldLeft("")((s1, s2) => s1 + "\n" + s2)
+    l.mkString("", "\n", "\n")
   }
 
   property("gives well formed formula on good parse") = Prop.forAll(genLines){
