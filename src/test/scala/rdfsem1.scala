@@ -20,18 +20,20 @@ object ent extends Properties("RDF 2004 Entailment") {
   import org.w3.swap.rdf2004.Semantics.entails
 
   val genVar = for {
-    n <- Gen.choose(1, 3)
+    n <- Gen.choose(1, 5)
   } yield BlankNode("_:v", Some(n))
 
-  val genURI = for {
 /* pruning... having trouble finding interesting cases for transitivity.
-
+  val genURI = for {
     scheme <- Gen.oneOf("http:", "data:", "ftp:", "mailto:")
     auth <- Gen.oneOf("//x.example", "//y.example", "//z.example", "")
-*/
     path <- Gen.oneOf("/a", "bob@example")
     frag <- Gen.oneOf("", "#date")
   } yield URI("data:" + path + frag)
+*/
+  val genURI = for {
+    s <- Gen.oneOf("dan", "bob", "Texas")
+  } yield URI("data:" + s)
 
   val genLiteral = Gen.oneOf(plain("abc"),
 			     data("2006-01-01", URI("<data:#date>")), 
@@ -40,19 +42,20 @@ object ent extends Properties("RDF 2004 Entailment") {
   val genSPO = for {
     s <- Gen.oneOf(genVar, genURI)
     p <- genURI
-    o <- Gen.oneOf(genVar, genURI, genLiteral)
+    //o <- Gen.oneOf(genVar, genURI, genLiteral)
+    o <- Gen.oneOf(genVar, genURI)
   } yield (s, p, o)
 
   val genGraph = for {
     size <- Gen.frequency(
-      (1, 0),
+      (0, 0),
       (10, 1),
       (5, 2),
-      (2, 3)
+      (2, 3),
+      (1, 4),
+      (1, 5),
+      (1, 6)
       /*
-      (5, 4),
-      (5, 5),
-      (2, 6)
       */
     )
     arcs <- Gen.listOfN(size, genSPO)
@@ -81,14 +84,19 @@ object ent extends Properties("RDF 2004 Entailment") {
 
   property("entailment is transitive") =
     Prop.forAll( (f: Formula, g: Formula, h: Formula) =>
-      (entails(f, g) && entails(g, h)) ==> {
+      entails(f, g) ==> {
 	/*
-	println("f |= g and g |= h. does f |= h?")
+	println("f |= g")
 	println (f)
 	println (g)
-	println (h)
 	*/ 
-	entails(f, h)
+	entails(g, h) ==> {
+	  /*
+	  println("... and g |= h. does f |= h?")
+	  println (h)
+	  */
+	  entails(f, h)
+	}
       }
    )
 }
