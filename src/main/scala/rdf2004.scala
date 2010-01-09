@@ -8,7 +8,7 @@ package org.w3.swap.rdf2004
 import org.w3.swap.logicalsyntax.{Formula, NotNil, And, Exists,
 				  Term, Variable,
 				  Application, Apply, Literal,
-				  Unifier
+				  Unifier, Simplifier
 				}
 
 /* Terms */
@@ -18,6 +18,9 @@ case class URI(val i: String) extends Application {
    * in the spec */
   override def fun = Symbol(i)
   override def args = Nil
+
+  import Unifier.Subst
+  override def subst(s: Subst): Term = this
 }
 
 case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
@@ -33,6 +36,55 @@ class SyntaxError(msg: String) extends Exception
 
 /* Formulas */
 object AbstractSyntax {
+  def wellformed(f: Formula): Boolean = {
+    f match {
+      case Exists(vs, g) => {
+	wfconj(g, vs)
+      }
+      case And(_) => wfconj(f, Nil)
+      case NotNil(_) => wfatom(f, Nil)
+      case _ => false
+    }
+  }
+
+  def wfconj(f: Formula, bound: List[Variable]): Boolean = {
+    println("@@wfconj? " + f.quote.print())
+    f match {
+      case And(fmlas) => fmlas.forall(g => wfatom(g, bound))
+      case NotNil(_) => wfatom(f, bound)
+      case _ => false
+    }
+  }
+
+  def wfatom(f: Formula, bound: List[Variable]): Boolean = {
+    println("@@wfatom? " + f.quote.print())
+    f match {
+      case NotNil(Apply('holds, List(s, p, o))) => {
+	(f.variables() -- bound).isEmpty && checkterm(s) && checkterm(p) && 
+	checkterm(o)
+      }
+      case _ => false
+    }
+  }
+
+  def checkterm(t: Term): Boolean = {
+    t match {
+      case BlankNode(_, _) => true
+      case URI(_) => true
+      case Literal(s: String) => true
+
+      /* TODO detail: lang code syntax */
+      case Apply('text, List(Literal(s: String),
+			     Literal(code: String) )) => true
+      /* TODO detail: URI syntax */
+      case Apply('data, List(URI(_),
+			     Literal(s: String) )) => true
+      case Apply('xml, List(Literal(s: String))) => true
+
+      case _ => false
+    }
+  }
+
   def plain(s: String): Term = Literal(s)
   def text(s: String, code: String): Term = Apply('text,
 						  List(Literal(code),
@@ -40,7 +92,7 @@ object AbstractSyntax {
   def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
   def xml(lex: String): Term = Apply('xml, List(Literal(lex)))
 
-  /* checks well-formedness of Atoms */
+  /* TODO: test that this produces only wffs or exceptions */
   def atom(s: Term, p: Term, o: Term) = {
     /* scalaQ: use lazy value instead of def? */
     def atom() = NotNil(Apply('holds, List(s, p, o)))
@@ -57,8 +109,10 @@ object AbstractSyntax {
     }
   }
 
-  /* preserves normal form
-   * preserves order of Atoms in And() */
+  /* preserves wff-ness
+   * preserves order of Atoms in And()
+   * assumes all variables are in the same scope
+   * */
   def add (f: Formula, s: Term, p: Term, o: Term): Formula = {
     val g = atom(s, p, o)
     val vg = g.variables
@@ -78,15 +132,6 @@ object AbstractSyntax {
       case _ => throw new SyntaxError("f must be an RDF 2004 formula")
     }
   }
-
-  /*
-   * TODO: wff() checker, normalize()
-   */
-
-  /*
-   * ISSUE: keep the triples sorted for ease of graph comparison?
-   * use a Set rather than a list? (Set interface, ListSet impl)
-   */
 }
 
 
@@ -102,6 +147,9 @@ object AbstractSyntax {
    */
 
 object Semantics {
+  import Simplifier.renamevars
+  import AbstractSyntax.wellformed
+
   def entails(f: Formula, g: Formula): Boolean = {
     /* assumes formulas are in RDF normal form:
      * And()
@@ -114,9 +162,14 @@ object Semantics {
       case NotNil(_) => List(f)
       case And(fmlas) => fmlas
       case Exists(vars, ff) => {
-	throw new Exception("@@fresh vars not implemented")
+	/* skolemize the variables in the antecedent */
+	/* should use functions rather than variables,
+	 * but as long as they're fresh, it doesn't matter.
+	 * */
+	List(renamevars(ff, vars))
       }
       case _ => {
+	/* TODO: check well-formedness in general. */
 	throw new SyntaxError("no Forall in RDF 2004")
       }
     }
@@ -129,6 +182,40 @@ object Semantics {
     }
 
     ! answers.isEmpty
+  }
+
+
+  /* TODO: probably better named conjunction */
+  def conjoin(f: Formula, g: Formula): Formula = {
+    println("@@conjoin" + f.quote.print() + " | " + g.quote.print())
+    assert(wellformed(f))
+    assert(wellformed(g))
+
+    (f, g) match {
+      case (Exists(vf, ff), Exists(vg, _)) => {
+	val shared = vf intersect vg
+	val g3: Formula = if (shared.isEmpty) g else renamevars(g, shared)
+	val g4 = g3.asInstanceOf[Exists]
+	println("@@conj g4" + g4.quote.print())
+	Exists(vf ++ g4.vars, conjoin2(ff, g4.f))
+      }
+      case (Exists(vf, ff), _) => {
+	Exists(vf, conjoin2(ff, g))
+      }
+      case (_, _) => conjoin2(f, g)
+    }
+  }
+
+  /* TODO: layer Formula types into Atom, Proposition, Sentence
+   * so that we can typecheck f and g as Propositions. */
+  def conjoin2(f: Formula, g: Formula): Formula = {
+    println("@@conjoin2" + f.quote.print() + " | " + g.quote.print())
+    (f, g) match {
+      case (And(fl), And(gl)) => And(fl ++ gl)
+      case (NotNil(_), And(gl)) => And(f :: gl)
+      case (NotNil(_), NotNil(_)) => And(List(f, g))
+      case (_, _) => throw new Exception("TODO: relayer types@@" + f.quote.print() + " g: " + g.quote.print())
+    }
   }
 }
 

@@ -94,7 +94,7 @@ class RDFSyntax extends Spec with ShouldMatchers {
 class RDFSemantics extends Spec with ShouldMatchers {
   import rdf2004.{BlankNode, URI}
   import rdf2004.AbstractSyntax.{plain}
-  import rdf2004.Semantics.entails
+  import rdf2004.Semantics.{entails, conjoin}
   import logicalsyntax.Unifier.{unify}
 
   val vhome = BlankNode("home", Some(1))
@@ -112,6 +112,23 @@ class RDFSemantics extends Spec with ShouldMatchers {
   }
 
   def mkf(s: String) = new NTriples().toFormula(s)
+
+  describe ("Semantics: Conjunction (aka merge)") {
+    val and2 = conjoin(mkf("""<data:bob> <data:home> <data:x> .
+			   <data:dan> <data:home> <data:Austin>."""),
+		       mkf("<data:x> <data:in> <data:tx> .") )
+    it("should work on this formula"){
+      (and2.quote().print()) should equal(
+ "@@"
+      )
+    }
+
+    it("should do renaming when necessary"){
+      val f = mkf("<data:bob> <data:home> _:somewhere .")
+      ( conjoin(f, f).quote.print()
+     ) should equal("@@")
+    }
+  }
 
   describe ("Entailment") {
     it("should handle X |= X for atomic, ground X") {

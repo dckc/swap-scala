@@ -15,6 +15,8 @@
 package org.w3.swap.logicalsyntax
 
 sealed abstract class Term() {
+  import Unifier.Subst
+
   def variables(): List[Variable] = {
     this match {
       case v: Variable => List(v)
@@ -23,6 +25,8 @@ sealed abstract class Term() {
       }
     }
   }
+
+  def subst(s: Subst): Term
 
   def quote(): SExp = {
     this match {
@@ -34,7 +38,12 @@ sealed abstract class Term() {
 }
 
 abstract class Variable() extends Term {
+  import Unifier.Subst
+
   def name: Symbol
+
+  import Unifier.lookup
+  override def subst(s: Subst): Term = lookup(this, s)
 }
 
 abstract class Application() extends Term {
@@ -43,13 +52,37 @@ abstract class Application() extends Term {
 }
 
 case class Literal(val value: Any) extends Application {
+  import Unifier.Subst
+
   override def fun = value
   override def args = Nil
+  override def subst(s: Subst): Term = this
 }
 
 case class Apply(sym: Symbol, terms: List[Term]) extends Application {
   override def fun = sym
   override def args = terms
+
+  import Unifier.Subst
+
+  override def subst(s: Subst): Term = {
+    /* don't make a new term unless we have to */
+    def each(tl: List[Term]): (Boolean, List[Term]) = {
+      tl match {
+	case Nil => (false, Nil)
+	case t1 :: rest => {
+	  val x = t1.subst(s)
+	  val (hit, rest2) = each(rest)
+
+	  if (t1.eq(x)) (hit, t1 :: rest2)
+	  else (true, x :: rest2)
+	}
+      }
+    }
+    val (hit, terms2) = each(terms)
+    if (hit) Apply(sym, terms2)
+    else this
+  }
 }
 
 object Unifier {
@@ -110,12 +143,37 @@ object Unifier {
 
 
 sealed abstract class Formula() {
+  import Unifier.Subst
+
   def variables(): List[Variable] = {
     this match {
       case NotNil(x) => x.variables()
-      case And(fl) => fl.flatMap(fmla => fmla.variables)
-      case Exists(vl, g) => vl ++ g.variables
-      case Forall(vl, g) => vl ++ g.variables
+      case And(fl) => fl.flatMap(fmla => fmla.variables())
+      case Exists(vl, g) => vl ++ g.variables()
+      case Forall(vl, g) => vl ++ g.variables()
+    }
+  }
+
+  def freevars(): List[Variable] = {
+    this match {
+      case NotNil(x) => x.variables()
+      case And(fl) => fl.flatMap(fmla => fmla.freevars())
+      case Exists(vl, g) => g.freevars() -- vl
+      case Forall(vl, g) => g.freevars() -- vl
+    }
+  }
+
+  def subst(s: Subst): Formula = {
+    this match {
+      /* TODO: don't make a new formula unless we have to. */
+      case NotNil(x) => NotNil(x.subst(s))
+      case And(fl) => And(fl.map(fmla => fmla.subst(s)))
+
+      /* assume the vars in s don't occur in vl.
+       * i.e. you can only substitute for free variables.
+       * TODO: assert this. */
+      case Exists(vl, g) => Exists(vl, g.subst(s))
+      case Forall(vl, g) => Forall(vl, g.subst(s))
     }
   }
 
@@ -149,6 +207,42 @@ case class And(fmlas: List[Formula]) extends Formula
 
 case class Exists(vars: List[Variable], f: Formula) extends Formula
 case class Forall(vars: List[Variable], f: Formula) extends Formula
+
+
+object Simplifier {
+  import Unifier.Subst
+
+  def renamevars(f: Formula, vl: List[Variable]): Formula = {
+    f.subst(mksubst(vl, Nil, Map()))
+  }
+
+  def mksubst(todo: List[Variable], taken: List[Variable], s: Subst): Subst = {
+    todo match {
+      case Nil => s
+      case v :: vrest => {
+	val vr = rename(v, taken)
+	mksubst(vrest, vr :: taken, s + (v -> vr))
+      }
+    }
+  }
+
+  case class Var(n: Symbol) extends Variable {
+    override def name = n
+  }
+
+  def rename(v: Variable, taken: List[Variable]): Variable = {
+    val names = taken.map(v => v.name)
+    val n = v.name
+    def trynext(n: Int): Variable = {
+      val name = Symbol(n + "." + n.toString())
+      if (names.indexOf(name) < 0) Var(name)
+      else trynext(n+1)
+    }
+    trynext(2)
+  }
+}
+
+
 
 /* TODO: consider skolemization */
 /* look at defchoose in ACL2
