@@ -13,6 +13,7 @@
  * */
 
 package org.w3.swap.logicalsyntax
+import org.w3.swap.SExp
 
 sealed abstract class Term() {
   import Unifier.Subst
@@ -158,8 +159,8 @@ sealed abstract class Formula() {
     this match {
       case NotNil(x) => x.variables()
       case And(fl) => fl.flatMap(fmla => fmla.freevars())
-      case Exists(vl, g) => g.freevars() -- vl
-      case Forall(vl, g) => g.freevars() -- vl
+      case Exists(vl, g) => g.freevars() filterNot (vl contains)
+      case Forall(vl, g) => g.freevars() filterNot (vl contains)
     }
   }
 

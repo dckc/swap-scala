@@ -1,22 +1,39 @@
+
 import org.scalacheck._
+import Prop._
+import Arbitrary.arbitrary
 
-// example from http://code.google.com/p/scalacheck/
+/* i hate import ._, but that's what the docs
+ * show and I can't figure out any other way.
+ * {Properties, Gen, Arbitrary, Prop} */
 
-object StringSpecification extends Properties("String") {
-  property("startsWith") = Prop.forAll((a: String, b: String) => (a+b).startsWith(a))
+/* cf http://code.google.com/p/scalacheck/
+ */
 
-  property("endsWith") = Prop.forAll((a: String, b: String) => (a+b).endsWith(b))
+import org.w3.swap.NTriples
 
-  // Is this really always true?
-  property("concat") = Prop.forAll((a: String, b: String) => 
-    (a+b).length > a.length && (a+b).length > b.length
-  )
+object ntp extends Properties("NTriples parsing") {
 
-  property("substring") = Prop.forAll((a: String, b: String) => 
-    (a+b).substring(a.length) == b
-  )
+  property ("ground doc") = forAll(genDoc) {
+    doc => false
+//    doc =>
+//      new NTriples().toFormula(doc).variables().isEmpty
+  }
 
-  property("substring") = Prop.forAll((a: String, b: String, c: String) =>
-    (a+b+c).substring(a.length, a.length+b.length) == b
-  )
+  val genConstant = Gen.oneOf("<data:bob>",
+			      "<data:dan>",
+			      "\"str1\"",
+			      "\"str2\"")
+  val genVar = for {
+    i <- arbitrary[Int]
+  } yield "_:v" + i.toString()
+
+  val genLine1 = for {
+    s <- genConstant
+    p <- genConstant
+    o <- genConstant
+  } yield s + " " + p + " " + o + ".\n"
+
+  def genDoc = genLine1
+
 }

@@ -17,3 +17,42 @@ http://code.google.com/p/simple-build-tool/wiki/Setup
 
 see project/build/rdfsem.scala for dependency info (i.e. sbt config)
 
+audit trail:
+
+
+134e44e306cdca626ef0d7b35cc646f1  sbt-launcher-0.5.6.jar
+http://simple-build-tool.googlecode.com/files/sbt-launcher-0.5.6.jar
+<- http://code.google.com/p/simple-build-tool/
+
+~/projects/rdfsem/lib_managed/test$ md5sum *
+18fec285fe7254553b3cfe392e617577  scalacheck-1.6.jar
+3724d2f7a0b4180fdef0317344b54b71  scalatest-1.0.jar
+
+~/bin$ wget http://simple-build-tool.googlecode.com/files/xsbt-launch-0.6.9.jar
+--2010-01-08 22:06:23--  http://simple-build-tool.googlecode.com/files/xsbt-launch-0.6.9.jar
+Resolving simple-build-tool.googlecode.com... 209.85.225.82
+Connecting to simple-build-tool.googlecode.com|209.85.225.82|:80... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 919329 (898K) [application/x-java-archive]
+Saving to: `xsbt-launch-0.6.9.jar'
+
+100%[======================================>] 919,329      871K/s   in 1.0s    
+
+2010-01-08 22:06:24 (871 KB/s) - `xsbt-launch-0.6.9.jar' saved [919329/919329]
+~/bin$ md5sum xsbt-launch-0.6.9.jar 
+fdb2facd9f5e90d7fce3aac092d3a45d  xsbt-launch-0.6.9.jar
+
+
+
+trying out IDEA
+
+~/projects/rdfsem$ JDK_HOME=/usr/lib/jvm/java-6-openjdk/ /opt/idea-IC-93.13/bin/idea.sh &
+
+http://www.jetbrains.com/idea/download/
+http://download.jetbrains.com/idea/ideaIC-9.0.tar.gz
+
+8c777898c9ef9f08fc27812be4e97db3  ideaIC-9.0.tar.gz
+$ ls -sh ideaIC-9.0.tar.gz
+66M ideaIC-9.0.tar.gz
+
+http://jetbrains.net/confluence/display/SCA/Getting+Started+with+IntelliJ+IDEA+Scala+Plugin

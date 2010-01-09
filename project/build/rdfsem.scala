@@ -8,10 +8,27 @@ import sbt.{ProjectInfo, DefaultProject}
 
 class TestingProject(info: ProjectInfo) extends DefaultProject(info)
 {
-  val scalatest = "org.scalatest" % "scalatest" % "0.9.5" % "test->default"
+  /* per SethTisue in #scala */
+  override def compileOptions =
+    "-g -unchecked -encoding us-ascii"
+     .split(" ").map(CompileOption).toSeq ++ super.compileOptions
 
-  // per http://code.google.com/p/scalacheck/
-// 1.6 isn't in the maven repo :-/
-//  val scalacheck = "org.scalacheck" % "scalacheck" % "1.6" % "test->default"
-//  val toolsrep = "Scala-Tools Repo" at "http://scala-tools.org"
+  /*
+   * val scalatest = "org.scalatest" % "scalatest" % "1.0" % "test->default"
+   */
+  val scalatest = "org.scalatest" % "scalatest" % "1.0.1-for-scala-2.8.0.Beta1-RC5-with-test-interfaces-0.2-SNAPSHOT" % "test"
+
+  /* per http://code.google.com/p/scalacheck/
+   * err... maybe
+   * http://groups.google.com/group/scalacheck/browse_thread/thread/09f5d84f40fe405a
+   */
+
+
+  /*
+   * <SethTisue> for ScalaCheck, I'm using val scalacheck = "org.scala-tools.testing" % "scalacheck_2.8.0.Beta1-RC5" % "1.7-SNAPSHOT" % "test"
+   */
+
+  val scalacheck = "org.scala-tools.testing" % "scalacheck_2.8.0.Beta1-RC5" % "1.7-SNAPSHOT" % "test"
+  val toolsrep = "Scala-Tools Repo" at "http://www.scala-tools.org/repo-releases"
+  val bleedingedge = "Scala-Tools testing" at "http://www.scala-tools.org/repo-snapshots/"
 }

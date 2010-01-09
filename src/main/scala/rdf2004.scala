@@ -68,8 +68,8 @@ object AbstractSyntax {
   def wfatom(f: Formula, bound: List[Variable]): Boolean = {
     f match {
       case NotNil(Apply('holds, List(s, p, o))) => {
-	(f.variables() -- bound).isEmpty && checkterm(s) && checkterm(p) && 
-	checkterm(o)
+	((f.variables() filterNot (bound contains)).isEmpty
+	 && checkterm(s) && checkterm(p) && checkterm(o))
       }
       case _ => false
     }
@@ -203,7 +203,7 @@ object Semantics {
 	val shared = vf intersect vg
 	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
 	  val sub = mksubst(shared, Nil, Map())
-	  val t3 = sub.values.toList
+	  val t3 = sub.valuesIterator.toList
 	  val vg3:List[Variable] =  t3.map(t => t.asInstanceOf[Variable])
 	  val g3 = gg.subst(sub)
 	  (vg3, g3)
