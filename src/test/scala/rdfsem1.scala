@@ -11,53 +11,50 @@ import Arbitrary.arbitrary
  */
 
 import org.w3.swap.NTriples
+import org.w3.swap.SyntaxError
+import org.w3.swap.rdf2004.AbstractSyntax.wellformed
 
 object ntp extends Properties("NTriples parsing") {
-  val genConst = Gen.oneOf("<data:bob>",
-			   "<data:dan>",
-			   "\"str1\"",
-			   "\"str2\"")
+
+  val genSubj = Gen.oneOf("<data:bob>", "<data:dan>",
+			  "_:x", "_:y", "_:z")
+  val genPred = Gen.oneOf("<data:name>", "<data:title>")
+
+  val genObj = Gen.oneOf("<data:bob>", "<data:dan>",
+			 "_:x", "_:y", "_:z",
+			 "\"str1\"", "\"str2\"",
+			 "\"str1\"@en", "\"str2\"@fn",
+			 "\"str1\"^^<data:int>", "\"str2\"^^<data:date>"
+		       )
 
   val gen3 = for {
-    s <- genConst
-    p <- genConst
-    o <- genConst
+    s <- genSubj
+    p <- genPred
+    o <- genObj
   } yield (s, p, o)
 
   val genLines = for {
-    l <- Gen.choose(3, 15)
-    v <- Gen.vectorOf(l, gen3)
+    l <- Gen.choose(0, 12)
+    v <- Gen.listOfN(l, gen3)
   } yield v
 
-  property("Nilsson - str - 3tup") = Prop.forAll(genLines){
+  def mkdoc(lines: List[(String, String, String)]): String = {
+    val l = lines.map(t => t._1 + " " + t._2 + " " + t._3 + ".")
+
+    /* scalaQ: no list.join("\n") in the Scala lib? */
+    l.foldLeft("")((s1, s2) => s1 + "\n" + s2)
+  }
+
+  property("gives well formed formula on good parse") = Prop.forAll(genLines){
     lines => {
-      val l = lines.map(t => t._1 + " " + t._2 + " " + t._3 + ".")
-      /* no list.join("\n") in the Scala lib? */
-      val doc = l.foldLeft("")((s1, s2) => s1 + "\n" + s2)
-      // println(doc)
-      true
+      try {
+	val f = new NTriples().toFormula(mkdoc(lines))
+	wellformed(f)
+      } catch {
+	case a: SyntaxError => true // bad text syntax; skip it
+
+	case other => throw other // scalaQ: no re-raise syntax?
+      }
     }
   }
-
-  /*
-  property("explore") = forAll((s: String) => false )
-
-  implicit val arbString = Arbitrary(genConstant)
-
-  */
-
-/*********
-  property ("ground doc") = forAll(genDoc) {
-    doc => false
-//    doc =>
-//      new NTriples().toFormula(doc).variables().isEmpty
-  }
-
-  val genVar = for {
-    i <- arbitrary[Int]
-  } yield "_:v" + i.toString()
-
-
-  def genDoc = genLine1
-********/
 }
