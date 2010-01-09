@@ -30,6 +30,16 @@ case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
       case Some(x) => Symbol(n + "." + x.toString())
     }
   }
+
+  /* For debuggin sanity etc., let's be sure that variables that
+   * look the same compare equal. */
+  override def equals(that: Any): Boolean = {
+    that match {
+      case b: BlankNode => name == b.name
+      case _ => false
+    }
+  }
+  override def hashCode(): Int = name.hashCode()
 }
 
 class SyntaxError(msg: String) extends Exception
@@ -48,7 +58,6 @@ object AbstractSyntax {
   }
 
   def wfconj(f: Formula, bound: List[Variable]): Boolean = {
-    println("@@wfconj? " + f.quote.print())
     f match {
       case And(fmlas) => fmlas.forall(g => wfatom(g, bound))
       case NotNil(_) => wfatom(f, bound)
@@ -57,7 +66,6 @@ object AbstractSyntax {
   }
 
   def wfatom(f: Formula, bound: List[Variable]): Boolean = {
-    println("@@wfatom? " + f.quote.print())
     f match {
       case NotNil(Apply('holds, List(s, p, o))) => {
 	(f.variables() -- bound).isEmpty && checkterm(s) && checkterm(p) && 
@@ -147,7 +155,7 @@ object AbstractSyntax {
    */
 
 object Semantics {
-  import Simplifier.renamevars
+  import Simplifier.{renamevars, mksubst}
   import AbstractSyntax.wellformed
 
   def entails(f: Formula, g: Formula): Boolean = {
@@ -187,17 +195,21 @@ object Semantics {
 
   /* TODO: probably better named conjunction */
   def conjoin(f: Formula, g: Formula): Formula = {
-    println("@@conjoin" + f.quote.print() + " | " + g.quote.print())
     assert(wellformed(f))
     assert(wellformed(g))
 
     (f, g) match {
-      case (Exists(vf, ff), Exists(vg, _)) => {
+      case (Exists(vf, ff), Exists(vg, gg)) => {
 	val shared = vf intersect vg
-	val g3: Formula = if (shared.isEmpty) g else renamevars(g, shared)
-	val g4 = g3.asInstanceOf[Exists]
-	println("@@conj g4" + g4.quote.print())
-	Exists(vf ++ g4.vars, conjoin2(ff, g4.f))
+	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
+	  val sub = mksubst(shared, Nil, Map())
+	  val t3 = sub.values.toList
+	  val vg3:List[Variable] =  t3.map(t => t.asInstanceOf[Variable])
+	  val g3 = gg.subst(sub)
+	  (vg3, g3)
+	}
+
+	Exists(vf ++ vg2, conjoin2(ff, g2))
       }
       case (Exists(vf, ff), _) => {
 	Exists(vf, conjoin2(ff, g))
@@ -209,7 +221,6 @@ object Semantics {
   /* TODO: layer Formula types into Atom, Proposition, Sentence
    * so that we can typecheck f and g as Propositions. */
   def conjoin2(f: Formula, g: Formula): Formula = {
-    println("@@conjoin2" + f.quote.print() + " | " + g.quote.print())
     (f, g) match {
       case (And(fl), And(gl)) => And(fl ++ gl)
       case (NotNil(_), And(gl)) => And(f :: gl)

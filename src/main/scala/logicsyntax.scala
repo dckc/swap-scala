@@ -232,9 +232,9 @@ object Simplifier {
 
   def rename(v: Variable, taken: List[Variable]): Variable = {
     val names = taken.map(v => v.name)
-    val n = v.name
+    val pfx = v.name
     def trynext(n: Int): Variable = {
-      val name = Symbol(n + "." + n.toString())
+      val name = Symbol(pfx + "." + n.toString())
       if (names.indexOf(name) < 0) Var(name)
       else trynext(n+1)
     }

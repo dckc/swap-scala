@@ -119,14 +119,14 @@ class RDFSemantics extends Spec with ShouldMatchers {
 		       mkf("<data:x> <data:in> <data:tx> .") )
     it("should work on this formula"){
       (and2.quote().print()) should equal(
- "@@"
+ "(and (holds (data:bob) (data:home) (data:x)) (holds (data:dan) (data:home) (data:Austin)) (holds (data:x) (data:in) (data:tx)))"
       )
     }
 
     it("should do renaming when necessary"){
       val f = mkf("<data:bob> <data:home> _:somewhere .")
       ( conjoin(f, f).quote.print()
-     ) should equal("@@")
+     ) should equal("(exists (_:somewhere '_:somewhere.2) (and (holds (data:bob) (data:home) _:somewhere) (holds (data:bob) (data:home) '_:somewhere.2)))")
     }
   }
 
