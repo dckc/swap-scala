@@ -48,7 +48,7 @@ object SExp {
       case Nil => NIL
       case hd :: tl => {
 	val hexp = hd match {
-	  case l: List[Any] => fromList(l)
+	  case l: List[_] => fromList(l)
 	  case e: SExp => e
 	  case _ => Atom(hd)
 	}
