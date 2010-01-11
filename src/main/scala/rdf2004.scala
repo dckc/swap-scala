@@ -108,9 +108,7 @@ object AbstractSyntax {
     p match {
       case URI(_) =>
 	s match {
-	  /* is there a scala syntax for folding 2 cases? */
-	  case BlankNode(_, _) => atom()
-	  case URI(_) => atom()
+	  case BlankNode(_, _) | URI(_) => atom()
 	  case _ => throw new SyntaxError("subject must be URI or Blank Node")
 	}
       case _ => throw new SyntaxError("predicate must be URI")
