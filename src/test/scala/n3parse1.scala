@@ -86,9 +86,9 @@ object n3parsing extends Properties("N3 Parsing") {
 
   val expected = List(
     IO("<#pat> <#knows> <#joe>.",
-       NotNil(Apply('holds, List(URI("data:#pat"),
-				 URI("data:#knows"),
-				 URI("data:#joe") )))
+       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#knows"),
+					  URI("data:#joe") )))))
        )
   )
 

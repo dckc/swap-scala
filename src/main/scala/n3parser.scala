@@ -83,7 +83,6 @@ class N3Parser(val baseURI: String) extends N3Lex {
   import org.w3.swap.rdf2004.BlankNode
   import N3AbstractSyntax.{atomic, EVar}
 
-/* ********@@
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()
 
@@ -94,29 +93,12 @@ class N3Parser(val baseURI: String) extends N3Lex {
 		 )
   val scopes = new mutable.Stack[Scope]()
   scopes.push(Scope(mutable.Set.empty, mutable.Set.empty, 1, 1))
-*********** */
 
-  def document: Parser[Formula] =
-    "." ^^ {
-      case x => And(List())
-    }
-/* ********
-    simplestatement ^^ {
-      case fmlas => {
-	And(fmlas)
-      }
-    }
-      **** */
-
-  /* ***************
-  val document: Parser[Formula] = statementsPeriod ^^ {
-    case sts => {
-      println("@@document. got here?")
-      mkFormula(sts)
-    }
+  def document: Parser[Formula] = statementsPeriod ^^ {
+    case sts => mkFormula(sts)
   }
 
-  val formulacontent: Parser[Formula] = statements ^^ {
+  def formulacontent: Parser[Formula] = statements ^^ {
     case sts => mkFormula(sts)
   }
 
@@ -131,7 +113,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
     }
   }
 
-  val statementsPeriod: Parser[List[Formula]] =
+  def statementsPeriod: Parser[List[Formula]] =
     rep(statement <~ ".") ^^ {
       case lists => lists.flatMap(fmlas => fmlas)
     }
@@ -141,7 +123,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
       case lists => lists.flatMap(fmlas => fmlas)
     }
 
-  val statement = ( declaration
+  def statement = ( declaration
 		   /**** test later
 		   * universal
 		   * existential
@@ -158,37 +140,34 @@ class N3Parser(val baseURI: String) extends N3Lex {
   }
   *** */
 
-  val declaration: Parser[List[Formula]] = prefixDecl | keywordsDecl
+  def declaration: Parser[List[Formula]] = prefixDecl | keywordsDecl
 
-  val prefixDecl: Parser[List[Formula]] = "@prefix" ~> prefix ~ uriref ^^ {
+  def prefixDecl: Parser[List[Formula]] = "@prefix" ~> prefix ~ uriref ^^ {
     case prefix ~ uriref => {
       namespaces.put(prefix, uriref)
       List[Formula]()
     }
   }
 
-  val keywordsDecl: Parser[List[Formula]] =
+  def keywordsDecl: Parser[List[Formula]] =
     "@keywords" ~> repsep(qname, ",") ^^ {
       /** TODO: implement keywords decl. kinda yucky */
       case qnames => List[Formula]()
     }
 
 
-  val simplestatement: Parser[List[Formula]] = term ~ propertylist ^^ {
-    case t1 ~ propertylist => {
-      println("@@simplestatement: " + t1.toString + propertylist.toString())
-
-      propertylist.map(poinv =>
+  def simplestatement: Parser[List[Formula]] =
+    term ~ propertylist ^^ {
+      case t1 ~ propertylist => propertylist.map(poinv =>
 	poinv match {
 	  // inverted?
 	  case (t2: Term, t3: Term, false) => atomic(t1, t2, t3)
 	  case (t2: Term, t3: Term, true) => atomic(t3, t2, t1)
 	})
     }
-  }
 
 
-  val propertylist: Parser[List[(Term, Term, Boolean)]] =
+  def propertylist: Parser[List[(Term, Term, Boolean)]] =
     repsep(property, ";") ^^ {
       case properties => properties.flatMap(x => x)
     }
@@ -204,12 +183,6 @@ class N3Parser(val baseURI: String) extends N3Lex {
       case t2 ~ tn => tn.map(ti => (t2, ti, true))
     }
   )
-******* */
-
-  def simplestatement: Parser[List[Formula]] =
-    term ~ term ~ term <~ "." ^^ {
-      case s ~ p ~ o => List(And(List()))
-    }
 
     // TODO: paths
   def term: Parser[Term] = (
