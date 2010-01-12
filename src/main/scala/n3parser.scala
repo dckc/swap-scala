@@ -31,6 +31,8 @@ object N3AbstractSyntax{
 case class QName(pfx: String, ln: String)
 
 class N3Lex extends NTriplesLex {
+  // treat comments as whitespace
+  override val whiteSpace = "(?:[ \t\n\r]|(?:#.*\n?))*".r
 
   def integer: Parser[Int] = "[+-]?[0-9]+".r ^^ {
     case numeral => {
@@ -213,6 +215,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
   def symbol: Parser[Term] = (
     uriref ^^ { case ref => URI(URISyntax.combine(baseURI, ref)) }
     | qname ^^ { case QName(p, l) => URI(namespaces(p) + l) }
+    | "a" ^^ { case s => URI(rdf2004.rdf + "type")
   )
 
   // N3, turtle, SPARQL have numeric, boolean literals too

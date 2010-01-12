@@ -130,6 +130,17 @@ object n3parsing extends Properties("N3 Parsing") {
 					    URI("data:#joe") ))))) )
       ))
 
+  property ("comments work like whitespace") =
+    ioProp(List(
+      IO("#neener", And(List())),
+      IO("@prefix : <#>. #abc", And(List())),
+      IO("<#pat> <#knows> <#joe>. #yay!",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#knows"),
+					    URI("data:#joe") )))))
+	 ) ))
+	 
+
   property ("integer, string literals work as objects, subjects") =
     ioProp(List(
       IO("<#pat> <#age> 23.",
