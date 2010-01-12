@@ -86,76 +86,6 @@ object n3parsing extends Properties("N3 Parsing") {
 
   case class IO(in: String, out: Formula)
 
-  val expected = List(
-    IO("", And(List())),
-    IO("<#pat> <#knows> <#joe>.",
-       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#knows"),
-					  URI("data:#joe") )))))
-       ),
-    IO("<#pat> <#age> 23.",
-       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#age"),
-					  Literal(23) )))))
-       ),
-    IO("22 <#lessThan> 23.",
-       And(List(NotNil(Apply('holds, List(Literal(22),
-					  URI("data:#lessThan"),
-					  Literal(23) )))))
-       ),
-    IO("<#pat> has <#age> 23.",
-       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#age"),
-					  Literal(23) )))))
-       ),
-    IO("23 is <#age> of <#pat>.",
-       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#age"),
-					  Literal(23) )))))
-       ),
-    IO("<#pat> <#name> \"Pat\".",
-       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#name"),
-					  Literal("Pat") )))))
-       ),
-    IO("<#pat> <#age> 23. <#pat> <#name> \"Pat\".",
-       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#age"),
-					  Literal(23) ))),
-		NotNil(Apply('holds, List(URI("data:#pat"),
-					  URI("data:#name"),
-					  Literal("Pat") ))) )) ),
-    IO("<#pat> <#child> [ <#age> 4 ].",
-       {
-	 val e1 = BlankNode("e", Some(0))
-	 def i(s: String): URI = URI("data:#" + s)
-	 Exists(List(e1),
-		And(List(atom(e1, i("age"), Literal(4)),
-			 atom(i("pat"), i("child"), e1) )) )
-       })
-
-    /* for later...
-    IO("""@prefix : <#>.
-       @prefix owl: <data:owl#>.
-       @prefix rdfs: <data:rdfs#>.
-       { ?pizza :toppings ?L.
-       ?C owl:oneOf ?L.
-       ?C rdfs:subClassOf [ owl:complementOf :MeatToppings] }
-       => { ?pizza a :VegetarianPizza }""",
-       Forall(List(Var("pizza"), Var("L"), Var("C")),
-	      Implies(
-		Exists(Exists(List(BlankNode("", Some((6, 20)))),
-			      And(atom(Var("pizza"),
-				       URI("data:#toppings"),
-				       Var("L") ),
-				  atom(Var("C")
-				       URI("data:owl#oneOf"),
-				       Var("L") ),
-				  ...
-     */
-       
-  )
-
   def parseTest(txt: String): Option[Formula] = {
     val parser = new N3Parser("data:")
     val result = parser.parseAll(parser.document, txt)
@@ -177,11 +107,96 @@ object n3parsing extends Properties("N3 Parsing") {
     }
   }
 
-  property ("test inputs give expected formulas") =
+  def ioProp(expected: List[IO]) =
     Prop.forAll(Gen.oneOf(expected.map(Gen.value): _*)){ io =>
       parseTest(io.in) match {
 	case Some(f) => ("wrong parse result: " + f.toString) |: f == io.out
 	case None => "parser Failure or Error" |: false
       }
     }
+
+  property ("empty document parses to the true formula, (and)") =
+    ioProp(List( IO("", And(List())) ))
+
+  property ("simple statements of 3 URI ref terms work") =
+    ioProp(List(
+      IO("<#pat> <#knows> <#joe>.",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#knows"),
+					    URI("data:#joe") ))))) ),
+      IO("<#pat> has <#brother> <#joe>.",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#brother"),
+					    URI("data:#joe") ))))) )
+      ))
+
+  property ("integer, string literals work as objects, subjects") =
+    ioProp(List(
+      IO("<#pat> <#age> 23.",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#age"),
+					    Literal(23) )))))
+       ),
+      IO("22 <#lessThan> 23.",
+	 And(List(NotNil(Apply('holds, List(Literal(22),
+					    URI("data:#lessThan"),
+					    Literal(23) )))))
+       ),
+      IO("<#pat> <#name> \"Pat\".",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#name"),
+					    Literal("Pat") )))))
+       )
+      ))
+
+  property ("is/of inverts sense of properties") =
+    ioProp(List(
+      IO("23 is <#age> of <#pat>.",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#age"),
+					    Literal(23) )))))
+       ) ))
+
+  property ("document with 2 statements works") =
+    ioProp(List(
+      IO("<#pat> <#age> 23. <#pat> <#name> \"Pat\".",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#age"),
+					    Literal(23) ))),
+		  NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#name"),
+					    Literal("Pat") ))) )) )
+    ))
+
+  property ("[] terms parse as bnodes with properties") =
+    ioProp(List(
+      IO("<#pat> <#child> [ <#age> 4 ].",
+	 {
+	   val e1 = BlankNode("e", Some(0))
+	   def i(s: String): URI = URI("data:#" + s)
+	   Exists(List(e1),
+		  And(List(atom(e1, i("age"), Literal(4)),
+			   atom(i("pat"), i("child"), e1) )) )
+	 })
+      ))
+
+    /* for later...
+    IO("""@prefix : <#>.
+       @prefix owl: <data:owl#>.
+       @prefix rdfs: <data:rdfs#>.
+       { ?pizza :toppings ?L.
+       ?C owl:oneOf ?L.
+       ?C rdfs:subClassOf [ owl:complementOf :MeatToppings] }
+       => { ?pizza a :VegetarianPizza }""",
+       Forall(List(Var("pizza"), Var("L"), Var("C")),
+	      Implies(
+		Exists(Exists(List(BlankNode("", Some((6, 20)))),
+			      And(atom(Var("pizza"),
+				       URI("data:#toppings"),
+				       Var("L") ),
+				  atom(Var("C")
+				       URI("data:owl#oneOf"),
+				       Var("L") ),
+				  ...
+     */
 }
