@@ -78,9 +78,11 @@ object numberLex extends Properties("N3 tokenization") {
 }
 
 object n3parsing extends Properties("N3 Parsing") {
-  import org.w3.swap.logicalsyntax.{Formula, And, NotNil, Apply, Literal}
-  import org.w3.swap.rdf2004.URI
+  import org.w3.swap.logicalsyntax.{Formula, Exists, And, NotNil,
+				    Apply, Literal}
+  import org.w3.swap.rdf2004.{URI, BlankNode}
   import org.w3.swap.N3Parser
+  import org.w3.swap.N3AbstractSyntax.atom
 
   case class IO(in: String, out: Formula)
 
@@ -96,6 +98,21 @@ object n3parsing extends Properties("N3 Parsing") {
 					  URI("data:#age"),
 					  Literal(23) )))))
        ),
+    IO("22 <#lessThan> 23.",
+       And(List(NotNil(Apply('holds, List(Literal(22),
+					  URI("data:#lessThan"),
+					  Literal(23) )))))
+       ),
+    IO("<#pat> has <#age> 23.",
+       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#age"),
+					  Literal(23) )))))
+       ),
+    IO("23 is <#age> of <#pat>.",
+       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#age"),
+					  Literal(23) )))))
+       ),
     IO("<#pat> <#name> \"Pat\".",
        And(List(NotNil(Apply('holds, List(URI("data:#pat"),
 					  URI("data:#name"),
@@ -107,21 +124,64 @@ object n3parsing extends Properties("N3 Parsing") {
 					  Literal(23) ))),
 		NotNil(Apply('holds, List(URI("data:#pat"),
 					  URI("data:#name"),
-					  Literal("Pat") ))) )) )
+					  Literal("Pat") ))) )) ),
+    IO("<#pat> <#child> [ <#age> 4 ].",
+       {
+	 val e1 = BlankNode("e", Some(0))
+	 def i(s: String): URI = URI("data:#" + s)
+	 Exists(List(e1),
+		And(List(atom(e1, i("age"), Literal(4)),
+			 atom(i("pat"), i("child"), e1) )) )
+       })
+
+    /* for later...
+    IO("""@prefix : <#>.
+       @prefix owl: <data:owl#>.
+       @prefix rdfs: <data:rdfs#>.
+       { ?pizza :toppings ?L.
+       ?C owl:oneOf ?L.
+       ?C rdfs:subClassOf [ owl:complementOf :MeatToppings] }
+       => { ?pizza a :VegetarianPizza }""",
+       Forall(List(Var("pizza"), Var("L"), Var("C")),
+	      Implies(
+		Exists(Exists(List(BlankNode("", Some((6, 20)))),
+			      And(atom(Var("pizza"),
+				       URI("data:#toppings"),
+				       Var("L") ),
+				  atom(Var("C")
+				       URI("data:owl#oneOf"),
+				       Var("L") ),
+				  ...
+     */
+       
   )
 
-  def parseTest(io: IO): Boolean = {
+  def parseTest(txt: String): Option[Formula] = {
     val parser = new N3Parser("data:")
-    val result = parser.parseAll(parser.document, io.in)
+    val result = parser.parseAll(parser.document, txt)
 
     result match {
-      case parser.Success(f, _ ) => f == io.out
-      case parser.Failure(_, _) | parser.Error(_, _) => false
+      case parser.Success(f, _ ) => Some(f)
+      case parser.Failure(x, y) => {
+	println("@@failure")
+	println(x)
+	println(y.pos.longString)
+	None
+      }
+      case parser.Error(x, y) => {
+	println("@@error")
+	println(x)
+	println(y)
+	None
+      }
     }
   }
 
-  property ("empty formula parses") =
+  property ("test inputs give expected formulas") =
     Prop.forAll(Gen.oneOf(expected.map(Gen.value): _*)){ io =>
-      parseTest(io)
+      parseTest(io.in) match {
+	case Some(f) => ("wrong parse result: " + f.toString) |: f == io.out
+	case None => "parser Failure or Error" |: false
+      }
     }
 }
