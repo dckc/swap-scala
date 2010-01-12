@@ -14,7 +14,7 @@ object numberLex extends Properties("N3 tokenization") {
 
   def dec(s: String) = new java.math.BigDecimal(s)
 
-  val expected: List[IO] = List(
+  val expectedNum: List[IO] = List(
     // TODO: what about really big integers?
 
     /* scala note: List(...) alone allows ints to be converted
@@ -31,14 +31,15 @@ object numberLex extends Properties("N3 tokenization") {
     IO("234e0 +234e34 +234e-34 234e-34 234e-34",
        List[Any](234e0, +234e34, +234e-34, 234e-34, 234e-34) ),
     IO("1324.2324 234e+34 -1.2 +1.2",
-       List[Any](dec("1324.2324"), 234.0e+34, dec("-1.2"), dec("+1.2"))),
-    IO("<abc> foo:bar ?x _:y",
-       List[Any]("data:abc", QName("foo", "bar"), "x", "y") )
+       List[Any](dec("1324.2324"), 234.0e+34, dec("-1.2"), dec("+1.2")))
   )
 
-  /* Gen.oneOf() takes repeated parameters; _* lets us call
-   * it on a list. */
-  val genExpected = Gen.oneOf(expected.map(Gen.value): _*)
+  val expectedOther: List[IO] = List(
+    IO("<abc> foo:bar ?x _:y",
+       List[Any]("data:abc", QName("foo", "bar"), "x", "y") ),
+    IO("<abc#def> foo:bar 123",
+       List[Any]("data:abc#def", QName("foo", "bar"), 123) )
+    )
 
   class N3TokenList extends N3Lex("data:") {
     /* darn... to implement the longest-matching rule, this is order-sensitive*/
@@ -49,17 +50,28 @@ object numberLex extends Properties("N3 tokenization") {
     )
   }
 
-  property ("numerals tokenize to the right classes in many cases") =
-    Prop.forAll(genExpected){
-      io => {
-	val lexer = new N3TokenList()
-	val result = lexer.parseAll(lexer.tokens, io.in)
+  def lexTest(io: IO): Boolean = {
+    val lexer = new N3TokenList()
+    val result = lexer.parseAll(lexer.tokens, io.in)
 
-	result match {
-	  case lexer.Success(tokens, _ ) => tokens == io.out
-	  case lexer.Failure(_, _) | lexer.Error(_, _) => false
-	}
-      }
+    result match {
+      case lexer.Success(tokens, _ ) => tokens == io.out
+      case lexer.Failure(_, _) | lexer.Error(_, _) => false
+    }
+  }
+
+  /* scala note:
+   * Gen.oneOf() takes repeated parameters; _* lets us call
+   * it on a list. */
+  property ("numerals tokenize correctly") =
+    Prop.forAll(Gen.oneOf(expectedNum.map(Gen.value): _*)){
+      io => lexTest(io)
+    }
+
+
+  property ("other tokens tokenize correctly") =
+    Prop.forAll(Gen.oneOf(expectedOther.map(Gen.value): _*)){
+      io => lexTest(io)
     }
 }
 
