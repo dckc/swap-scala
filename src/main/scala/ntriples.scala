@@ -12,34 +12,9 @@ import rdf2004.AbstractSyntax.{plain, data, text, atom}
 
 class SyntaxError(msg: String) extends Exception
 
-class NTriples extends RegexParsers {
-  /* turn off whitespace skipping? or just take newlines out? */
-  override val whiteSpace = "(?:(?:#.*\n)|[ \t\n]+)*".r
-
-  def ntriplesDoc: Parser[Formula] = rep(line) ^^ {
-    case List() => And(List())
-    case atoms => {
-      val vars = atoms.flatMap(f => f.variables)
-      if (vars.isEmpty) { And(atoms) }
-      else { Exists(vars.removeDuplicates, And(atoms)) }
-    }
-  }
-
-  /* never mind eoln*/
-  def line: Parser[Formula] = triple
-
-  def triple: Parser[Formula] = subject ~ predicate ~ objectt <~ "." ^^ {
-    case s~p~o => atom(s, p, o)
-  }
-
-  def subject: Parser[Term] = uriref | nodeID
-
-  def predicate: Parser[Term] = uriref
-
-  def objectt: Parser[Term] = uriref | nodeID | literal
-
+class NTriplesLex extends RegexParsers {
   /* fold in absoluteURI */
-  def uriref: Parser[Term] = "<[^>]+>".r ^^ {
+  def absuri: Parser[Term] = "<[^>]+>".r ^^ {
     case str => mkuri(str)
   }
 
@@ -69,6 +44,34 @@ class NTriples extends RegexParsers {
   /* TODO: escapes */
   def dequote(str: String) = str.substring(1, str.length() - 1)
   def mkuri(str: String) = new URI(dequote(str))
+}
+
+
+class NTriples extends NTriplesLex {
+  /* turn off whitespace skipping? or just take newlines out? */
+  override val whiteSpace = "(?:(?:#.*\n)|[ \t\n]+)*".r
+
+  def ntriplesDoc: Parser[Formula] = rep(line) ^^ {
+    case List() => And(List())
+    case atoms => {
+      val vars = atoms.flatMap(f => f.variables)
+      if (vars.isEmpty) { And(atoms) }
+      else { Exists(vars.removeDuplicates, And(atoms)) }
+    }
+  }
+
+  /* never mind eoln*/
+  def line: Parser[Formula] = triple
+
+  def triple: Parser[Formula] = subject ~ predicate ~ objectt <~ "." ^^ {
+    case s~p~o => atom(s, p, o)
+  }
+
+  def subject: Parser[Term] = absuri | nodeID
+
+  def predicate: Parser[Term] = absuri
+
+  def objectt: Parser[Term] = absuri | nodeID | literal
 
   def toFormula(doc: String): Formula = {
     this.parseAll(ntriplesDoc, doc) match {
