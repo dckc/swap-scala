@@ -162,6 +162,11 @@ object n3parsing extends Properties("N3 Parsing") {
 	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
 					    URI("data:#name"),
 					    Literal("Pat") )))))
+       ),
+      IO("<#pat> <#name> \"\"\"'data:text/rdf+n3;charset=utf-8;base64,QHByZWZpeCBsb2c6IDxodHRwOi8vd3d3LnczLm9yZy8yMDAwLzEwL3N3YXAvbG9nIz4gLgp7fSA9PiB7OmEgOmIgOmN9IC4g'\"\"\".",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#name"),
+					    Literal("'data:text/rdf+n3;charset=utf-8;base64,QHByZWZpeCBsb2c6IDxodHRwOi8vd3d3LnczLm9yZy8yMDAwLzEwL3N3YXAvbG9nIz4gLgp7fSA9PiB7OmEgOmIgOmN9IC4g'") )))))
        )
       ))
 
@@ -180,6 +185,11 @@ object n3parsing extends Properties("N3 Parsing") {
 			       List(URI("data:#pat"),
 				    URI("data:#knows"),
 				    URI("data:#joe") ))))) ),
+      IO("@prefix : <#>. :pat :knows :joe-joe.",
+	 And(List(NotNil(Apply('holds,
+			       List(URI("data:#pat"),
+				    URI("data:#knows"),
+				    URI("data:#joe-joe") ))))) ),
       IO("@prefix : <http://example/vocab#>. :pat :knows :joe.",
 	 And(List(NotNil(Apply('holds,
 			       List(URI("http://example/vocab#pat"),

@@ -50,11 +50,13 @@ class N3Lex extends NTriplesLex {
   }
 
   def stringLit3: Parser[String] =
-    ("\"\"\"" + """(?:"|(?:"")|[^"\\]|(?:\\[tbnrf\\"]))*"""
+    ("\"\"\"" + """(?:[^"\\]+|"|(?:"")|(?:\\[tbnrf\\"]))*"""
               + "\"\"\"" //"emacs
-    ).r ^^ {
+    ).r ^^  {
       // TODO: escapes in triple-quoted strings
-      case str => str.substring(3, str.length() - 3)
+      case str => {
+	str.substring(3, str.length() - 3)
+      }
   }
 
   // NTriples doesn't allow relative URI refs; N3 does.
@@ -67,7 +69,7 @@ class N3Lex extends NTriplesLex {
 
   /* note _:xyz is an evar but _a:xyz is a qname */
   val prefix_re = """(?:((?:_[A-Za-z0-9_]+)|(?:[A-Za-z][A-Za-z0-9_]*)|):)"""
-  val localname_re = """([A-Za-z][A-Za-z0-9_]*)"""
+  val localname_re = """([A-Za-z][A-Za-z0-9_-]*)"""
 
   /* TODO: add ? after prefix_re when we do keywords */
   val Qname_re = (prefix_re + localname_re).r
