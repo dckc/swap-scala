@@ -78,18 +78,36 @@ object numberLex extends Properties("N3 tokenization") {
 }
 
 object n3parsing extends Properties("N3 Parsing") {
-  import org.w3.swap.logicalsyntax.{Formula, And, NotNil, Apply}
+  import org.w3.swap.logicalsyntax.{Formula, And, NotNil, Apply, Literal}
   import org.w3.swap.rdf2004.URI
   import org.w3.swap.N3Parser
 
   case class IO(in: String, out: Formula)
 
   val expected = List(
+    IO("", And(List())),
     IO("<#pat> <#knows> <#joe>.",
        And(List(NotNil(Apply('holds, List(URI("data:#pat"),
 					  URI("data:#knows"),
 					  URI("data:#joe") )))))
-       )
+       ),
+    IO("<#pat> <#age> 23.",
+       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#age"),
+					  Literal(23) )))))
+       ),
+    IO("<#pat> <#name> \"Pat\".",
+       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#name"),
+					  Literal("Pat") )))))
+       ),
+    IO("<#pat> <#age> 23. <#pat> <#name> \"Pat\".",
+       And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#age"),
+					  Literal(23) ))),
+		NotNil(Apply('holds, List(URI("data:#pat"),
+					  URI("data:#name"),
+					  Literal("Pat") ))) )) )
   )
 
   def parseTest(io: IO): Boolean = {

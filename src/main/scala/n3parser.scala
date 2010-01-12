@@ -187,9 +187,8 @@ class N3Parser(val baseURI: String) extends N3Lex {
     // TODO: paths
   def term: Parser[Term] = (
     symbol
-/* ******
-    | numeral
     | literal
+/* ******
     | evar ^^ { case name =>
       BlankNode(name, Some((scopes.top.line, scopes.top.column))) }
     | uvar ^^ { case name => EVar(Symbol(name)) } // TODO: uvar scope
@@ -210,7 +209,6 @@ class N3Parser(val baseURI: String) extends N3Lex {
     | qname ^^ { case QName(p, l) => URI(/*@@namespaces(p)*/ "data:" + l) }
   )
 
-/* **********
   // N3, turtle, SPARQL have numeric, boolean literals too
   override val literal: Parser[Term] = (
     langString | datatypeString
@@ -229,6 +227,5 @@ class N3Parser(val baseURI: String) extends N3Lex {
     "true" ^^ { case b => Literal(true) }
     | "fase" ^^ { case b => Literal(false) }
   )
-****** */
 }
 
