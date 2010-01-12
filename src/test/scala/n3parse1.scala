@@ -157,6 +157,11 @@ object n3parsing extends Properties("N3 Parsing") {
 	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
 					    URI("data:#name"),
 					    Literal("Pat") )))))
+       ),
+      IO("<#pat> <#name> \"\"\"Pat\"\"\".",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#name"),
+					    Literal("Pat") )))))
        )
       ))
 

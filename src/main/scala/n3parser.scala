@@ -49,6 +49,14 @@ class N3Lex extends NTriplesLex {
     case numeral => new BigDecimal(numeral)
   }
 
+  def stringLit3: Parser[String] =
+    ("\"\"\"" + """(?:"|(?:"")|[^"\\]|(?:\\[tbnrf\\"]))*"""
+              + "\"\"\"" //"emacs
+    ).r ^^ {
+      // TODO: escapes in triple-quoted strings
+      case str => str.substring(3, str.length() - 3)
+  }
+
   // NTriples doesn't allow relative URI refs; N3 does.
   def uriref: Parser[String] =
     """<([^<>'{}|^`&&[^\x01-\x20]])*>""".r ^^ {
@@ -215,12 +223,21 @@ class N3Parser(val baseURI: String) extends N3Lex {
   def symbol: Parser[Term] = (
     uriref ^^ { case ref => URI(URISyntax.combine(baseURI, ref)) }
     | qname ^^ { case QName(p, l) => URI(namespaces(p) + l) }
-    | "a" ^^ { case s => URI(rdf2004.rdf + "type")
+    | "a" ^^ {
+      case s => URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type") }
+    | "=" ^^ {
+      case s => URI("http://www.w3.org/2002/07/owl#sameAs") }
+    /* 
+    | "=>" ^^ {
+      case s => URI("http://www.w3.org/2000/10/swap/log#implies") }
+      */
   )
 
   // N3, turtle, SPARQL have numeric, boolean literals too
   override val literal: Parser[Term] = (
+    // TODO: can langString and datatypeString use """s too?
     langString | datatypeString
+    | stringLit3 ^^ { case s => Literal(s) }
     | numeral
     | boolean
     )
