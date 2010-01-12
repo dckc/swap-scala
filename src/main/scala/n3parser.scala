@@ -20,7 +20,7 @@ object URISyntax {
 object N3AbstractSyntax{
   import logicalsyntax.{NotNil, Term, Variable, Apply}
 
-  def atom(s: Term, p: Term, o: Term) = NotNil(Apply('holds, List(s, p, o)))
+  def atomic(s: Term, p: Term, o: Term) = NotNil(Apply('holds, List(s, p, o)))
 
   case class EVar(n: Symbol) extends Variable {
     override def name = n
@@ -29,27 +29,27 @@ object N3AbstractSyntax{
 
 case class QName(pfx: String, ln: String)
 
-class N3Lex(baseURI: String) extends NTriplesLex {
+class N3Lex extends NTriplesLex {
 
-  val integer: Parser[Int] = "[+-]?[0-9]+".r ^^ {
+  def integer: Parser[Int] = "[+-]?[0-9]+".r ^^ {
     case numeral => {
       val n = if (numeral.startsWith("+")) numeral.substring(1) else numeral
       java.lang.Integer.parseInt(n)
     }
   }
 
-  val double: Parser[Double] = "[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)".r ^^ {
+  def double: Parser[Double] = "[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)".r ^^ {
     case numeral => java.lang.Double.parseDouble(numeral)
   }
 
-  val decimal: Parser[BigDecimal] = "[+-]?[0-9]+(\\.[0-9]+)".r ^^ {
+  def decimal: Parser[BigDecimal] = "[+-]?[0-9]+(\\.[0-9]+)".r ^^ {
     case numeral => new BigDecimal(numeral)
   }
 
   // NTriples doesn't allow relative URI refs; N3 does.
-  val uriref: Parser[String] =
+  def uriref: Parser[String] =
     """<([^<>'{}|^`&&[^\x01-\x20]])*>""".r ^^ {
-      case str => URISyntax.combine(baseURI, str.substring(1, str.length()-1))
+      case str => str.substring(1, str.length()-1)
     }
 
   // TODO: non-ASCII name characters
@@ -59,30 +59,31 @@ class N3Lex(baseURI: String) extends NTriplesLex {
   val localname_re = """([A-Za-z][A-Za-z0-9_]*)"""
 
   val Qname_re = (prefix_re + localname_re).r
-  val qname: Parser[QName] = Qname_re ^^ {
+  def qname: Parser[QName] = Qname_re ^^ {
     case str => str match { case Qname_re(p, l) => QName(p, l) }
   }
 
-  val prefix: Parser[String] = prefix_re.r ^^ {
+  def prefix: Parser[String] = prefix_re.r ^^ {
     /* strip off the colon*/
     case str => str.substring(0, str.length() - 1)
   }
 
-  val uvar: Parser[String] = ("\\?" + localname_re).r ^^ {
+  def uvar: Parser[String] = ("\\?" + localname_re).r ^^ {
     case str => str.substring(1)
   }
 
-  val evar: Parser[String] = ("_:" + localname_re).r ^^ {
+  def evar: Parser[String] = ("_:" + localname_re).r ^^ {
     case str => str.substring(2)
   }
 }
 
-class N3Parser(baseURI: String) extends N3Lex(baseURI) {
+class N3Parser(val baseURI: String) extends N3Lex {
   import logicalsyntax.{Formula, Exists, Forall, And,
 			Term, Variable, Apply, Literal}
   import org.w3.swap.rdf2004.BlankNode
-  import N3AbstractSyntax.{atom, EVar}
+  import N3AbstractSyntax.{atomic, EVar}
 
+/* ********@@
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()
 
@@ -93,9 +94,26 @@ class N3Parser(baseURI: String) extends N3Lex(baseURI) {
 		 )
   val scopes = new mutable.Stack[Scope]()
   scopes.push(Scope(mutable.Set.empty, mutable.Set.empty, 1, 1))
+*********** */
 
+  def document: Parser[Formula] =
+    "." ^^ {
+      case x => And(List())
+    }
+/* ********
+    simplestatement ^^ {
+      case fmlas => {
+	And(fmlas)
+      }
+    }
+      **** */
+
+  /* ***************
   val document: Parser[Formula] = statementsPeriod ^^ {
-    case sts => mkFormula(sts)
+    case sts => {
+      println("@@document. got here?")
+      mkFormula(sts)
+    }
   }
 
   val formulacontent: Parser[Formula] = statements ^^ {
@@ -113,13 +131,15 @@ class N3Parser(baseURI: String) extends N3Lex(baseURI) {
     }
   }
 
-  val statementsPeriod: Parser[List[Formula]] = rep(statement <~ ".") ^^ {
-    case lists => lists.flatMap(fmlas => fmlas)
-  }
+  val statementsPeriod: Parser[List[Formula]] =
+    rep(statement <~ ".") ^^ {
+      case lists => lists.flatMap(fmlas => fmlas)
+    }
 
-  val statements: Parser[List[Formula]] = repsep(statement, ".") ^^ {
-    case lists => lists.flatMap(fmlas => fmlas)
-  }
+  val statements: Parser[List[Formula]] =
+    repsep(statement, ".") <~ opt(".") ^^ {
+      case lists => lists.flatMap(fmlas => fmlas)
+    }
 
   val statement = ( declaration
 		   /**** test later
@@ -155,12 +175,16 @@ class N3Parser(baseURI: String) extends N3Lex(baseURI) {
 
 
   val simplestatement: Parser[List[Formula]] = term ~ propertylist ^^ {
-    case t1 ~ propertylist => propertylist.map(poinv =>
-      poinv match {
-	// inverted?
-	case (t2: Term, t3: Term, false) => atom(t1, t2, t3)
-	case (t2: Term, t3: Term, true) => atom(t3, t2, t1)
-      })
+    case t1 ~ propertylist => {
+      println("@@simplestatement: " + t1.toString + propertylist.toString())
+
+      propertylist.map(poinv =>
+	poinv match {
+	  // inverted?
+	  case (t2: Term, t3: Term, false) => atomic(t1, t2, t3)
+	  case (t2: Term, t3: Term, true) => atomic(t3, t2, t1)
+	})
+    }
   }
 
 
@@ -180,10 +204,18 @@ class N3Parser(baseURI: String) extends N3Lex(baseURI) {
       case t2 ~ tn => tn.map(ti => (t2, ti, true))
     }
   )
+******* */
+
+  def simplestatement: Parser[List[Formula]] =
+    term ~ term ~ term <~ "." ^^ {
+      case s ~ p ~ o => List(And(List()))
+    }
 
     // TODO: paths
-  val term: Parser[Term] = (
+  def term: Parser[Term] = (
     symbol
+/* ******
+    | numeral
     | literal
     | evar ^^ { case name =>
       BlankNode(name, Some((scopes.top.line, scopes.top.column))) }
@@ -197,13 +229,15 @@ class N3Parser(baseURI: String) extends N3Lex(baseURI) {
     | "(" ~> rep(term) <~ ")" ^^ {
       case items => Apply('list, items) // TODO: first/rest for lists?
     }
+*/
   )
 
-  val symbol: Parser[Term] = (
-    uriref ^^ { case absuri => URI(absuri) }
-    | qname ^^ { case QName(p, l) => URI(namespaces(p) + l) }
+  def symbol: Parser[Term] = (
+    uriref ^^ { case ref => URI(URISyntax.combine(baseURI, ref)) }
+    | qname ^^ { case QName(p, l) => URI(/*@@namespaces(p)*/ "data:" + l) }
   )
 
+/* **********
   // N3, turtle, SPARQL have numeric, boolean literals too
   override val literal: Parser[Term] = (
     langString | datatypeString
@@ -222,5 +256,6 @@ class N3Parser(baseURI: String) extends N3Lex(baseURI) {
     "true" ^^ { case b => Literal(true) }
     | "fase" ^^ { case b => Literal(false) }
   )
+****** */
 }
 

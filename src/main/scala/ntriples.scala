@@ -13,19 +13,17 @@ import rdf2004.AbstractSyntax.{plain, data, text, atom}
 class SyntaxError(msg: String) extends Exception
 
 class NTriplesLex extends RegexParsers {
+  def literal: Parser[Term] = langString | datatypeString
+
+  /* why can't I move these methods to an object? */
+  /* TODO: escapes */
+  def mkuri(str: String) = new URI(dequote(str))
+  def dequote(str: String) = str.substring(1, str.length() - 1)
+
   /* fold in absoluteURI */
   def absuri: Parser[Term] = "<[^>]+>".r ^^ {
     case str => mkuri(str)
   }
-
-  def nodeID: Parser[Term] = "_:[A-Za-z][A-Za-z0-9]*".r ^^ {
-    case str => {
-      val n = str.substring(2).intern()
-      BlankNode("_:" + n, None)
-    }
-  }
-
-  def literal: Parser[Term] = langString | datatypeString
 
   def langString: Parser[Term] =
     /* technically, this would allow spaces around the @ */
@@ -40,10 +38,6 @@ class NTriplesLex extends RegexParsers {
       case value ~ _ ~ dt => data(value, mkuri(dt))
     }
 
-  /* why can't I move these methods to an object? */
-  /* TODO: escapes */
-  def dequote(str: String) = str.substring(1, str.length() - 1)
-  def mkuri(str: String) = new URI(dequote(str))
 }
 
 
@@ -72,6 +66,13 @@ class NTriples extends NTriplesLex {
   def predicate: Parser[Term] = absuri
 
   def objectt: Parser[Term] = absuri | nodeID | literal
+
+  def nodeID: Parser[Term] = "_:[A-Za-z][A-Za-z0-9]*".r ^^ {
+    case str => {
+      val n = str.substring(2).intern()
+      BlankNode("_:" + n, None)
+    }
+  }
 
   def toFormula(doc: String): Formula = {
     this.parseAll(ntriplesDoc, doc) match {

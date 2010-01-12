@@ -1,3 +1,5 @@
+package org.w3.swap.test
+
 /* tests for N3 parsing
  * */
 
@@ -36,12 +38,12 @@ object numberLex extends Properties("N3 tokenization") {
 
   val expectedOther: List[IO] = List(
     IO("<abc> foo:bar ?x _:y",
-       List[Any]("data:abc", QName("foo", "bar"), "x", "y") ),
+       List[Any]("abc", QName("foo", "bar"), "x", "y") ),
     IO("<abc#def> foo:bar 123",
-       List[Any]("data:abc#def", QName("foo", "bar"), 123) )
+       List[Any]("abc#def", QName("foo", "bar"), 123) )
     )
 
-  class N3TokenList extends N3Lex("data:") {
+  class N3TokenList extends N3Lex {
     /* darn... to implement the longest-matching rule, this is order-sensitive*/
     def tokens: Parser[List[Any]] = rep(
       double | decimal | integer
@@ -75,3 +77,33 @@ object numberLex extends Properties("N3 tokenization") {
     }
 }
 
+object n3parsing extends Properties("N3 Parsing") {
+  import org.w3.swap.logicalsyntax.{Formula, And, NotNil, Apply}
+  import org.w3.swap.rdf2004.URI
+  import org.w3.swap.N3Parser
+
+  case class IO(in: String, out: Formula)
+
+  val expected = List(
+    IO("<#pat> <#knows> <#joe>.",
+       NotNil(Apply('holds, List(URI("data:#pat"),
+				 URI("data:#knows"),
+				 URI("data:#joe") )))
+       )
+  )
+
+  def parseTest(io: IO): Boolean = {
+    val parser = new N3Parser("data:")
+    val result = parser.parseAll(parser.document, io.in)
+
+    result match {
+      case parser.Success(f, _ ) => f == io.out
+      case parser.Failure(_, _) | parser.Error(_, _) => false
+    }
+  }
+
+  property ("empty formula parses") =
+    Prop.forAll(Gen.oneOf(expected.map(Gen.value): _*)){ io =>
+      parseTest(io)
+    }
+}
