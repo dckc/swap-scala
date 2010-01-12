@@ -160,9 +160,15 @@ object n3parsing extends Properties("N3 Parsing") {
   property ("empty prefix decl") =
     ioProp(List(
       IO("@prefix : <#>. :pat :knows :joe.",
-	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
-					    URI("data:#knows"),
-					    URI("data:#joe") ))))) )
+	 And(List(NotNil(Apply('holds,
+			       List(URI("data:#pat"),
+				    URI("data:#knows"),
+				    URI("data:#joe") ))))) ),
+      IO("@prefix : <http://example/vocab#>. :pat :knows :joe.",
+	 And(List(NotNil(Apply('holds,
+			       List(URI("http://example/vocab#pat"),
+				    URI("http://example/vocab#knows"),
+				    URI("http://example/vocab#joe") ))))) )
       ))
 
   property ("document with 2 statements works") =

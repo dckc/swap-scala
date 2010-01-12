@@ -13,7 +13,8 @@ import rdf2004.URI // TODO: find a better place for URI than rdf2004
 
 object URISyntax {
   def combine(base: String, ref: String): String = {
-    return base + ref // TODO: real URI combine
+    if (ref.contains(":")) ref
+    else base + ref // TODO: real URI combine
   }
 }
 
