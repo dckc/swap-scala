@@ -157,6 +157,14 @@ object n3parsing extends Properties("N3 Parsing") {
 					    Literal(23) )))))
        ) ))
 
+  property ("empty prefix decl") =
+    ioProp(List(
+      IO("@prefix : <#>. :pat :knows :joe.",
+	 And(List(NotNil(Apply('holds, List(URI("data:#pat"),
+					    URI("data:#knows"),
+					    URI("data:#joe") ))))) )
+      ))
+
   property ("document with 2 statements works") =
     ioProp(List(
       IO("<#pat> <#age> 23. <#pat> <#name> \"Pat\".",

@@ -55,10 +55,10 @@ class N3Lex extends NTriplesLex {
   // TODO: non-ASCII name characters
 
   /* note _:xyz is an evar but _a:xyz is a qname */
-  /* TODO: add ? at end of prefix_re when we do keywords */
-  val prefix_re = """(?:((?:_[A-Za-z0-9_]+)|(?:[A-Za-z][A-Za-z0-9_]*)):)"""
+  val prefix_re = """(?:((?:_[A-Za-z0-9_]+)|(?:[A-Za-z][A-Za-z0-9_]*)|):)"""
   val localname_re = """([A-Za-z][A-Za-z0-9_]*)"""
 
+  /* TODO: add ? after prefix_re when we do keywords */
   val Qname_re = (prefix_re + localname_re).r
   def qname: Parser[QName] = Qname_re ^^ {
     case str => str match { case Qname_re(p, l) => QName(p, l) }
@@ -140,7 +140,9 @@ class N3Parser(val baseURI: String) extends N3Lex {
   def declaration: Parser[Unit] = prefixDecl | keywordsDecl
 
   def prefixDecl: Parser[Unit] = "@prefix" ~> prefix ~ uriref ^^ {
-    case prefix ~ uriref => namespaces.put(prefix, uriref)
+    case prefix ~ ref => {
+      namespaces.put(prefix, URISyntax.combine(baseURI, ref))
+    }
   }
 
   def keywordsDecl: Parser[Unit] = "@keywords" ~> repsep(qname, ",") ^^ {
@@ -209,7 +211,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
 
   def symbol: Parser[Term] = (
     uriref ^^ { case ref => URI(URISyntax.combine(baseURI, ref)) }
-    | qname ^^ { case QName(p, l) => URI(/*@@namespaces(p)*/ "data:" + l) }
+    | qname ^^ { case QName(p, l) => URI(namespaces(p) + l) }
   )
 
   // N3, turtle, SPARQL have numeric, boolean literals too
