@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="scalatest">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib_managed/scala_2.8.0.Beta1-RC5/test/test-interface-0.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib_managed/scala_2.8.0.Beta1-RC5/test/scalatest-1.0.1-for-scala-2.8.0.Beta1-RC5-with-test-interfaces-0.2-SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
