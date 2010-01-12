@@ -6,8 +6,9 @@ import Prop._
 import Arbitrary.arbitrary
 
 
-object numberLex extends Properties("lexical analysis of numbers") {
-  import org.w3.swap.{N3Lex}
+object numberLex extends Properties("N3 tokenization") {
+  import org.w3.swap.N3Lex
+  import org.w3.swap.QName
 
   case class IO(in: String, out: List[Any])
 
@@ -30,16 +31,22 @@ object numberLex extends Properties("lexical analysis of numbers") {
     IO("234e0 +234e34 +234e-34 234e-34 234e-34",
        List[Any](234e0, +234e34, +234e-34, 234e-34, 234e-34) ),
     IO("1324.2324 234e+34 -1.2 +1.2",
-       List[Any](dec("1324.2324"), 234.0e+34, dec("-1.2"), dec("+1.2")))
+       List[Any](dec("1324.2324"), 234.0e+34, dec("-1.2"), dec("+1.2"))),
+    IO("<abc> foo:bar ?x _:y",
+       List[Any]("data:abc", QName("foo", "bar"), "x", "y") )
   )
 
   /* Gen.oneOf() takes repeated parameters; _* lets us call
    * it on a list. */
   val genExpected = Gen.oneOf(expected.map(Gen.value): _*)
 
-  class N3TokenList extends N3Lex {
+  class N3TokenList extends N3Lex("data:") {
     /* darn... to implement the longest-matching rule, this is order-sensitive*/
-    def tokens: Parser[List[Any]] = rep(double | decimal | integer)
+    def tokens: Parser[List[Any]] = rep(
+      double | decimal | integer
+      | uriref | qname
+      | evar | uvar
+    )
   }
 
   property ("numerals tokenize to the right classes in many cases") =

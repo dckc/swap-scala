@@ -27,6 +27,8 @@ object N3AbstractSyntax{
   }
 }  
 
+case class QName(pfx: String, ln: String)
+
 class N3Lex(baseURI: String) extends NTriplesLex {
 
   val integer: Parser[Int] = "[+-]?[0-9]+".r ^^ {
@@ -50,8 +52,6 @@ class N3Lex(baseURI: String) extends NTriplesLex {
       case str => URISyntax.combine(baseURI, str.substring(1, str.length()-1))
     }
 
-  case class QName(pfx: String, ln: String)
-
   // TODO: non-ASCII name characters
 
   /* note _:xyz is an evar but _a:xyz is a qname */
@@ -68,7 +68,7 @@ class N3Lex(baseURI: String) extends NTriplesLex {
     case str => str.substring(0, str.length() - 1)
   }
 
-  val uvar: Parser[String] = ("?" + localname_re).r ^^ {
+  val uvar: Parser[String] = ("\\?" + localname_re).r ^^ {
     case str => str.substring(1)
   }
 
