@@ -72,7 +72,7 @@ class RDFXMLParser(base: String) {
 	val res = e \ attr_resource
 	val pt = e \ attr_parseType
 	val dt = e \ attr_datatype
-	val lang = e \ attr_datatype
+	val lang = e \ attr_lang
 	val elems = e.child.filter(c => c.isInstanceOf[Elem])
 
 	val obj = (!res.isEmpty, pt.text, elems.length) match {
@@ -82,7 +82,7 @@ class RDFXMLParser(base: String) {
 	    parseProperties(r, e.child)
 	    r
 	  }
-	  case (false, "XML", _) => throw new Exception("@@TODO: XML")
+	  case (false, "Literal", _) => throw new Exception("@@TODO: XML")
 	  case (false, "Collection", _) =>
 	    throw new Exception("@@TODO: Collection")
 	  case (false, "", 1) => parseNodeElement(elems(0).asInstanceOf[Elem])
