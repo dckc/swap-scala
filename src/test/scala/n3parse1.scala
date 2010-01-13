@@ -1,6 +1,7 @@
 package org.w3.swap.test
 
 /* tests for N3 parsing
+ * todo: try http://www.w3.org/2000/10/swap/test/n3parser.tests
  * */
 
 import org.scalacheck._

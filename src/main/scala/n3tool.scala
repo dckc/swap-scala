@@ -1,4 +1,6 @@
 package org.w3.swap
+import org.w3.swap.n3.N3Parser
+import org.w3.swap.rdf.RDFXMLParser
 
 import java.io.{FileReader, FileNotFoundException}
 
@@ -47,7 +49,7 @@ object N3Tool {
 
   def readRDF(addr: String) {
     import scala.xml.XML
-    import org.w3.swap.RDFXMLParser
+    import org.w3.swap.rdf.RDFXMLParser
 
     val e = XML.load(addr)
     val p = new RDFXMLParser(addr) // @@TODO: absolutize base

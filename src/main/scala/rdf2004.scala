@@ -3,13 +3,26 @@
  * http://www.w3.org/TR/2004/REC-rdf-concepts-20040210/
  */
 
-package org.w3.swap.rdf2004
+package org.w3.swap.rdf
 
-import org.w3.swap.logicalsyntax.{Formula, NotNil, And, Exists,
-				  Term, Variable,
-				  Application, Apply, Literal,
-				  Unifier, Simplifier
-				}
+import org.w3.swap.logic.{Formula, Atomic, And, Exists,
+			  Term, Variable,
+			  Application, Apply, Literal,
+			  AbstractSyntax => Logic
+			}
+
+case class NotNil(x: Term) extends Atomic {
+  import Logic.Subst
+
+  def variables() = x.variables()
+  def freevars() = x.variables()
+  def subst(s: Subst) = NotNil(x.subst(s))
+
+  /* This sorta promotes terms to formulas, which is like ACL2.
+   * But *unlike* ACL2, (and ...) is a formula, not a term,
+   * and the formulas below it may be quantified. Hmm.*/
+  def quote() = x.quote()
+}
 
 /* Terms */
 case class URI(val i: String) extends Application {
@@ -19,8 +32,8 @@ case class URI(val i: String) extends Application {
   override def fun = Symbol(i)
   override def args = Nil
 
-  import Unifier.Subst
-  override def subst(s: Subst): Term = this
+  import Logic.Subst
+  override def subst(s: Subst) = this
 }
 
 case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
@@ -32,7 +45,8 @@ case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
   }
 
   /* For debuggin sanity etc., let's be sure that variables that
-   * look the same compare equal. */
+   * look the same compare equal.
+   * TODO: consider moving this constraint up to Variable. */
   override def equals(that: Any): Boolean = {
     that match {
       case b: BlankNode => name == b.name
@@ -44,8 +58,9 @@ case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
 
 class SyntaxError(msg: String) extends Exception
 
-/* Formulas */
 object AbstractSyntax {
+  final val rdf_type = URI(Vocabulary.`type`)
+
   def wellformed(f: Formula): Boolean = {
     f match {
       case Exists(vs, g) => {
@@ -78,13 +93,13 @@ object AbstractSyntax {
   def checkterm(t: Term): Boolean = {
     t match {
       case BlankNode(_, _) => true
+      /* TODO detail: URI syntax */
       case URI(_) => true
       case Literal(s: String) => true
 
       /* TODO detail: lang code syntax */
       case Apply('text, List(Literal(s: String),
 			     Literal(code: String) )) => true
-      /* TODO detail: URI syntax */
       case Apply('data, List(URI(_),
 			     Literal(s: String) )) => true
       case Apply('xml, List(Literal(s: String))) => true
@@ -100,10 +115,20 @@ object AbstractSyntax {
   def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
   def xml(lex: String): Term = Apply('xml, List(Literal(lex)))
 
+  /**
+   * holds(s, p, o) is a term that is not nil iff s is related to o by p.
+   *
+   * TODO: consider using a distinct type for Holds.
+   * TODO: consider using an Either type to constrain s to URI, BlankNode
+   * TODO: consider constraining p to URI. (but keep in mind generalized
+   *       graphs in the RDFS sense.)
+   */
+  def holds(s: Term, p: Term, o: Term) = Apply('holds, List(s, p, o))
+
   /* TODO: test that this produces only wffs or exceptions */
   def atom(s: Term, p: Term, o: Term) = {
     /* scalaQ: use lazy value instead of def? */
-    def atom() = NotNil(Apply('holds, List(s, p, o)))
+    def atom() = NotNil(holds(s, p, o))
 
     p match {
       case URI(_) =>
@@ -126,11 +151,11 @@ object AbstractSyntax {
     f match {
       case NotNil(_) => {
 	if (vg.isEmpty) { And(List(f, g)) }
-	else { Exists(vg, And(List(f, g))) }
+	else { Exists(vg.toList, And(List(f, g))) }
       }
       case And(fl) => {
 	if (vg.isEmpty) { And(fl ++ List(g)) }
-	else { Exists(vg, And(fl ++ List(g))) }
+	else { Exists(vg.toList, And(fl ++ List(g))) }
       }
       case Exists(vl, And(fl)) => {
 	Exists(vl ++ g.variables, And(fl ++ List(g)))
@@ -153,7 +178,7 @@ object AbstractSyntax {
    */
 
 object Semantics {
-  import Simplifier.{renamevars, mksubst}
+  import Logic.{renamevars, mksubst}
   import AbstractSyntax.wellformed
 
   def entails(f: Formula, g: Formula): Boolean = {
@@ -172,7 +197,7 @@ object Semantics {
 	/* should use functions rather than variables,
 	 * but as long as they're fresh, it doesn't matter.
 	 * */
-	List(renamevars(ff, vars))
+	List(renamevars(ff, vars.toList))
       }
       case _ => {
 	/* TODO: check well-formedness in general. */
@@ -198,7 +223,7 @@ object Semantics {
 
     (f, g) match {
       case (Exists(vf, ff), Exists(vg, gg)) => {
-	val shared = vf intersect vg
+	val shared = vf.toList intersect vg.toList
 	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
 	  val sub = mksubst(shared, Nil, Map())
 	  val t3 = sub.valuesIterator.toList
@@ -216,14 +241,12 @@ object Semantics {
     }
   }
 
-  /* TODO: layer Formula types into Atom, Proposition, Sentence
-   * so that we can typecheck f and g as Propositions. */
   def conjoin2(f: Formula, g: Formula): Formula = {
     (f, g) match {
       case (And(fl), And(gl)) => And(fl ++ gl)
-      case (NotNil(_), And(gl)) => And(f :: gl)
+      case (NotNil(_), And(gl)) => And(List(f) ++ gl)
       case (NotNil(_), NotNil(_)) => And(List(f, g))
-      case (_, _) => throw new Exception("TODO: relayer types@@" + f.quote.print() + " g: " + g.quote.print())
+      case (_, _) => throw new Exception("illformed formula@@" + f.quote.print() + " g: " + g.quote.print())
     }
   }
 }
@@ -231,7 +254,7 @@ object Semantics {
 class GoalRestriction(msg: String) extends Exception
 
 class KnowledgeBase(facts: Stream[Formula]) {
-  import Unifier.{Subst, unify}
+  import Logic.{Subst, unify}
 
   /* TODO: index kb by FunctionSymbol
    * a la:
@@ -252,7 +275,7 @@ class KnowledgeBase(facts: Stream[Formula]) {
     }
   }
 
-  def solveall(goals: List[Formula], s: Subst): Stream[Subst] = {
+  def solveall(goals: Iterable[Formula], s: Subst): Stream[Subst] = {
     goals match {
       case Nil => Stream.cons(s, Stream.empty)
       case List(g) => solve(g, s)

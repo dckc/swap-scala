@@ -1,30 +1,25 @@
-package org.w3.swap
+package org.w3.swap.n3
 
 import java.math.BigDecimal
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
-import rdf2004.URI // TODO: find a better place for URI than rdf2004
+import org.w3.swap.rdf.{URI, NotNil}
+import org.w3.swap.uri.Util.combine
+import org.w3.swap.logic.{Term, Apply, Variable}
 
-object URISyntax {
-  def combine(base: String, ref: String): String = {
-    if (ref.contains(":")) ref
-    else base + ref // TODO: real URI combine
-  }
-}
-
-object N3AbstractSyntax{
-  import logicalsyntax.{NotNil, Term, Variable, Apply}
-
+object AbstractSyntax{
   def atom(s: Term, p: Term, o: Term) = NotNil(Apply('holds, List(s, p, o)))
-
-  case class EVar(n: Symbol) extends Variable {
-    override def name = n
-  }
 }  
 
-case class QName(pfx: String, ln: String)
+case class EVar(n: Symbol) extends Variable {
+  override def name = n
+}
 
-class N3Lex extends NTriplesLex {
+/* TODO: bugfix: re-using NTriplesStrings allows extra spaces,
+ * e.g. "abc"@ en and "10" ^^<data:#int>
+ * TODO: oops! ntriples doesn't allow qnames in datatype literals
+ * */
+class N3Lex extends org.w3.swap.ntriples.NTriplesStrings {
   // treat comments as whitespace
   override val whiteSpace = "(?:[ \t\n\r]|(?:#.*\n?))*".r
 
@@ -43,16 +38,6 @@ class N3Lex extends NTriplesLex {
     case numeral => new BigDecimal(numeral)
   }
 
-  def stringLit3: Parser[String] =
-    ("\"\"\"" + """(?:[^"\\]+|"|(?:"")|(?:\\[tbnrf\\"]))*"""
-              + "\"\"\"" //"emacs
-    ).r ^^  {
-      // TODO: escapes in triple-quoted strings
-      case str => {
-	str.substring(3, str.length() - 3)
-      }
-  }
-
   // NTriples doesn't allow relative URI refs; N3 does.
   def uriref: Parser[String] =
     """<([^<>'{}|^`&&[^\x01-\x20]])*>""".r ^^ {
@@ -60,6 +45,8 @@ class N3Lex extends NTriplesLex {
     }
 
   // TODO: non-ASCII name characters
+
+  case class QName(pfx: String, ln: String)
 
   /* note _:xyz is an evar but _a:xyz is a qname */
   val prefix_re = """(?:((?:_[A-Za-z0-9_]+)|(?:[A-Za-z][A-Za-z0-9_]*)|):)"""
@@ -82,6 +69,17 @@ class N3Lex extends NTriplesLex {
 
   def evar: Parser[String] = ("_:" + localname_re).r ^^ {
     case str => str.substring(2)
+  }
+
+  // emacs gets confused by this
+  def stringLit3: Parser[String] =
+    ("\"\"\"" + """(?:[^"\\]+|"|(?:"")|(?:\\[tbnrf\\"]))*"""
+              + "\"\"\"" //"emacs
+    ).r ^^  {
+      // TODO: escapes in triple-quoted strings
+      case str => {
+	str.substring(3, str.length() - 3)
+      }
   }
 }
 
@@ -113,15 +111,15 @@ class N3Lex extends NTriplesLex {
  *                p.parseAll(p.document, "<#x> <#prop> 23")
  *                (holds (data:#x) (data:#prop) 23)
  *
- *                see also URISyntax.combine
+ *                see also combine
  * 
  * @author <a href="http://www.w3.org/People/Connolly/">Dan Connolly</a>
  */
 class N3Parser(val baseURI: String) extends N3Lex {
-  import logicalsyntax.{Formula, Exists, Forall, And,
-			Term, Variable, Apply, Literal}
-  import org.w3.swap.rdf2004.BlankNode
-  import N3AbstractSyntax.{atom, EVar}
+  import org.w3.swap.logic.{Formula, Exists, Forall, And,
+			    Term, Variable, Apply, Literal}
+  import org.w3.swap.rdf.BlankNode
+  import AbstractSyntax.atom
 
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()
@@ -134,7 +132,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
 		    new mutable.Stack(),
 		    new mutable.Stack()))
 
-  def document: Parser[Formula] = rep(statement <~ ".") ^^ {
+  def document: Parser[Formula] = phrase(rep(statement <~ ".")) ^^ {
     case sts => mkFormula(scopes.top.statements.toList.reverse)
   }
 
@@ -180,7 +178,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
 
   def prefixDecl: Parser[Unit] = "@prefix" ~> prefix ~ uriref ^^ {
     case prefix ~ ref => {
-      namespaces.put(prefix, URISyntax.combine(baseURI, ref))
+      namespaces.put(prefix, combine(baseURI, ref))
     }
   }
 
@@ -249,7 +247,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
   )
 
   def symbol: Parser[Term] = (
-    uriref ^^ { case ref => URI(URISyntax.combine(baseURI, ref)) }
+    uriref ^^ { case ref => URI(combine(baseURI, ref)) }
     | qname ^^ { case QName(p, l) => URI(namespaces(p) + l) }
     | "a" ^^ {
       case s => URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type") }
@@ -262,7 +260,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
   )
 
   // N3, turtle, SPARQL have numeric, boolean literals too
-  override val literal: Parser[Term] = (
+  val literal: Parser[Term] = (
     // TODO: can langString and datatypeString use """s too?
     langString | datatypeString
     | stringLit3 ^^ { case s => Literal(s) }

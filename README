@@ -79,8 +79,14 @@ java API docs
 
 scala API docs
 
+2.8 nightly:
+http://www.scala-lang.org/archives/downloads/distrib/files/nightly/docs/library/index.html
+
 Programming in Scala book
 
 maybe dev tools belongs in advogato blog article?
 
 http://www.planetscala.com/
+
+TimBL asked about loading code from the web... 
+http://www.scala-lang.org/docu/files/api/scala/mobile/Location.html

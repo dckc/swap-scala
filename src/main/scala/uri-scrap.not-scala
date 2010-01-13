@@ -1,0 +1,41 @@
+  /**
+   * split a URI reference between the fragment and the rest.
+   *
+   * Punctuation is thrown away.
+   *
+   * @test
+   * scala> splitFrag("abc#def")
+   * @@type stuff ('abc', Some('def'))
+   *
+   * @test
+   * scala>> splitFrag("abcdef")
+   * @@typestuff ('abcdef', None)
+   */
+  def splitFrag(uri: String): (String, Option[String]) = {
+    uri.lastIndexOf("#") match {
+      case -1 => (uri, None)
+      case i => (uri.substring(0, i), Some(uri.substring(i+1, uri.length)))
+    }
+  }
+
+  /**
+   * split a URI reference between the fragment and the rest,
+   * keeping punctuation.
+   */
+  def splitFrag(uri: String): (String, Option[String]) = {
+    uri.lastIndexOf("#") match {
+      case -1 => (uri, None)
+      case i => (uri.substring(0, i), Some(uri.substring(i, uri.length)))
+    }
+  }
+
+  /**
+   * isAbsolute. not yet implemented.
+   * 
+   * Hark to <a href="http://java.sun.com/javase/6/docs/api/java/io/File.html"
+   * >java.io.File</a>.
+   * */
+  def isAbsolute(uri: String): Boolean = {
+    throw new Exception("TODO: implement isAbsolute")
+    true
+  }

@@ -1,84 +1,119 @@
-/* N-triples
- * http://www.w3.org/TR/2004/REC-rdf-testcases-20040210/#ntriples
- */
+package org.w3.swap.ntriples
 
-package org.w3.swap
-
+/* Parsers brings magic such as ~ and ^^ */
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
-import logicalsyntax.{Formula, And, Exists, Term}
-import rdf2004.{URI,BlankNode}
-import rdf2004.AbstractSyntax.{plain, data, text, atom}
-
-class SyntaxError(msg: String) extends Exception
-
-class NTriplesLex extends RegexParsers {
-  def literal: Parser[Term] = langString | datatypeString
-
-  /* why can't I move these methods to an object? */
-  /* TODO: escapes */
-  def mkuri(str: String) = new URI(dequote(str))
-  def dequote(str: String) = str.substring(1, str.length() - 1)
-
-  /* fold in absoluteURI */
-  def absuri: Parser[Term] = "<[^>]+>".r ^^ {
-    case str => mkuri(str)
-  }
-
-  def langString: Parser[Term] =
-    /* technically, this would allow spaces around the @ */
-    "\"[^\"]+\"".r ~ opt("@" ~> "[a-z]+(-[a-z0-9]+)*".r) ^^ {
-      case str ~ None => plain(dequote(str))
-      case str ~ Some(code) => text(dequote(str), code)
-    }
-
-  def datatypeString: Parser[Term] =
-    /* technically, this would allow spaces around the ^^ */
-    "\"[^\"]+\"".r ~ "^^" ~ "<[^>]+>".r ^^ {
-      case value ~ _ ~ dt => data(value, mkuri(dt))
-    }
-
-}
+import org.w3.swap.logic.{Formula, And, Exists, Term}
+import org.w3.swap.rdf.{URI, BlankNode, AbstractSyntax, Vocabulary}
+import AbstractSyntax.{atom, plain, data, text}
 
 
-class NTriples extends NTriplesLex {
-  /* turn off whitespace skipping? or just take newlines out? */
-  override val whiteSpace = "(?:(?:#.*\n)|[ \t\n]+)*".r
-
-  def ntriplesDoc: Parser[Formula] = rep(line) ^^ {
+/**
+ * Parser for N-Triples, a simple line-oriented RDF format.
+ *
+ * The language is specified in
+ * <a href="http://www.w3.org/TR/2004/REC-rdf-testcases-20040210/#ntriples"
+ * >section 3. N-Triples of <cite>RDF Test Cases</cite></a>.
+ */
+class NTriplesParser extends NTriplesStrings {
+  def ntripleDoc: Parser[Formula] = phrase(rep(line)) ^^ {
     case List() => And(List())
     case atoms => {
       val vars = atoms.flatMap(f => f.variables)
-      if (vars.isEmpty) { And(atoms) }
-      else { Exists(vars.removeDuplicates, And(atoms)) }
+      if (vars.isEmpty) And(atoms)
+      else { Exists(vars.toList.removeDuplicates, And(atoms)) }
     }
   }
 
-  /* never mind eoln*/
-  def line: Parser[Formula] = triple
+  /**
+   * Spec says: line  	::=  	ws* ( comment | triple )? eoln
+   * but we want to make sure we get a formula, so we skip
+   * until we get one
+   */
+  def line: Parser[Formula] = rep(ws_s | comment_eoln) ~> triple <~ eoln
 
-  def triple: Parser[Formula] = subject ~ predicate ~ objectt <~ "." ^^ {
-    case s~p~o => atom(s, p, o)
+  /**
+   * We'll handle whitespace explicitly.
+   */
+  override val whiteSpace = "".r
+
+  /**
+   * combine comment and eoln
+   */
+  def comment_eoln: Parser[String] = "#[^\n\r]*(?:\n|\r|(?:\r\n))"
+
+  def triple: Parser[Formula] =
+    subject ~ ws_p ~ predicate ~ ws_p ~ `object` <~ ws_s <~ "." <~ ws_s ^^ {
+    case s~_~p~_~o => atom(s, p, o)
   }
 
-  def subject: Parser[Term] = absuri | nodeID
+  def subject: Parser[Term] = uriref | nodeID
 
-  def predicate: Parser[Term] = absuri
+  def predicate: Parser[Term] = uriref
 
-  def objectt: Parser[Term] = absuri | nodeID | literal
+  def `object`: Parser[Term] = uriref | nodeID | literal
 
+  /*
+   * Spec says:
+   * uriref  	::=  	'<' absoluteURI '>'
+   * absoluteURI  	::=  	character+ with...
+   *
+   * TODO: restrict to US-ASCII
+   */
+  def uriref: Parser[Term] = "<[^>]+>".r ^^ {
+    case str => mkuri(str)
+  }
+
+  /*
+   * Spec says:
+   * nodeID  	::=  	'_:' name
+   * name  	::=  	[A-Za-z][A-Za-z0-9]*
+   */
   def nodeID: Parser[Term] = "_:[A-Za-z][A-Za-z0-9]*".r ^^ {
-    case str => {
-      val n = str.substring(2).intern()
-      BlankNode("_:" + n, None)
+    case str => BlankNode(str, None)
+  }
+
+  def literal: Parser[Term] = langString | datatypeString
+
+  /**
+   * Spec says: ws  	::=  	space | tab
+   * This includes repetition
+   */
+  def ws_p: Parser[String] = "[ \t]+"
+  def ws_s: Parser[String] = "[ \t]*"
+
+  def eoln: Parser[String] = """\n|\r|(?:\r\n)""".r
+
+  /**
+   * TODO: move this to test code.
+   */
+  def toFormula(doc: String): Formula = {
+    this.parseAll(ntripleDoc, doc) match {
+      case Success(f, _) => f
+      case _ => And(Nil)
     }
   }
 
-  def toFormula(doc: String): Formula = {
-    this.parseAll(ntriplesDoc, doc) match {
-      case Success(f, _) => f
-      case Failure(msg, _) => throw new SyntaxError(msg)
-      case Error(msg, _) => throw new SyntaxError(msg)
+}
+
+/* this is factored out for re-use in n3 */
+class NTriplesStrings extends RegexParsers {
+  /* fold in language */
+  def langString: Parser[Term] =
+    "\"[^\"\r\n]+\"".r ~ opt("@[a-z]+(-[a-z0-9]+)*".r) ^^ {
+      case str ~ None => plain(dequote(str))
+      case str ~ Some(code) => text(dequote(str), code.substring(1))
     }
+
+  def datatypeString: Parser[Term] =
+    "\"[^\"\n]+\"".r ~ "^^" ~ "<[^>]+>".r ^^ {
+      case value~_~dt => data(value, mkuri(dt))
+    }
+
+  protected def mkuri(str: String) = new URI(dequote(str))
+
+  protected def dequote(str: String) = {
+    assert(!str.contains("\\"), "TODO: escapes in URIs, strings")
+    str.substring(1, str.length() - 1)
   }
 }

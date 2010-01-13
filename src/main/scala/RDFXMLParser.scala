@@ -1,21 +1,16 @@
-package org.w3.swap
+package org.w3.swap.rdf
+import Vocabulary.nsuri
+import AbstractSyntax.rdf_type
 
 import scala.xml.{Elem, NodeSeq, Node}
 
-object RDFSyntax {
-  final val nsuri = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-}
-
 class RDFXMLParser(base: String) {
-  import RDFSyntax.nsuri
-  import logicalsyntax.{Formula, Exists, And, Term}
-  import rdf2004.{URI, BlankNode}
-  import rdf2004.AbstractSyntax.{atom, plain, data, text}
+  import Vocabulary.nsuri
+  import org.w3.swap.logic.{Formula, Exists, And, Term}
+  import AbstractSyntax.{atom, plain, data, text}
 
   import scala.collection.mutable
   val statements = new mutable.Stack[Formula]()
-
-  final val rdf_type = URI(nsuri + "type")
 
   def parse(e: Elem): Formula = {
     e match {
@@ -31,7 +26,7 @@ class RDFXMLParser(base: String) {
     val f1 = And(statements.toList)
     val vars = f1.variables() // or keep a list/stack as we go?
     if (vars.isEmpty) f1
-    else Exists(vars, f1)
+    else Exists(vars.toList, f1)
   }
 
   private def euri(e: Elem) = URI(e.namespace + e.label)

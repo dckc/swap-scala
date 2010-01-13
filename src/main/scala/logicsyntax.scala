@@ -1,73 +1,159 @@
-/* Abstract syntax of a First Order Logic
- * largely following ACL2.
- * 
- * Matt Kaufmann and J Moore
- * A Precise Description of the ACL2 Logic
- * April, 1998.
- * http://www.cs.utexas.edu/users/moore/publications/km97a.pdf
+package org.w3.swap.logic
+import org.w3.swap.{SExp, Atom}
+
+/**
+ * Formula of an arbitrary first order logic.
  *
- * see also
- * cf http://en.wikipedia.org/wiki/First-order_logic#Terms
- * and
- * http://en.wikipedia.org/wiki/First-order_logic#Formulas
- * */
+ * See <a href="http://en.wikipedia.org/wiki/First-order_logic#Formulas"
+ * >Formulas</a> in the wikipedia article.
+ *
+ * A Formula is either an Atom, Unary, Binary, or Nary.
+ *
+ * TODO: generalize wellFormed from RDF to here.
+ * TODO: add Not, Or, and Implies, and consider intuitionistic vs. classical.
+ */
+sealed abstract class Formula() {
+  import AbstractSyntax.Subst
 
-package org.w3.swap.logicalsyntax
-import org.w3.swap.SExp
+  def variables(): Iterable[Variable]
 
-sealed abstract class Term() {
-  import Unifier.Subst
+  def freevars(): Iterable[Variable]
 
-  def variables(): List[Variable] = {
-    this match {
-      case v: Variable => List(v)
-      case a: Application => {
-	a.args.flatMap(term => term.variables())
-      }
-    }
+  /* TODO: don't make a new formula unless we have to. */
+  def subst(s: Subst): Formula
+
+  def quote(): SExp
+
+  override def toString() = quote().print()
+}
+
+abstract class Atomic extends Formula
+abstract class Unary(f: Formula) extends Formula
+abstract class Binary(f: Formula, g: Formula) extends Formula
+abstract class Nary(val connective: Symbol,
+		    val fl: Iterable[Formula]) extends Formula {
+  override def quote() = connective :: fl.toList.map(f => f.quote())
+
+  override def variables() = fl.flatMap(fmla => fmla.variables())
+  override def freevars() = fl.flatMap(fmla => fmla.freevars())
+}
+
+case class And(val fmlas: Iterable[Formula]) extends Nary('and, fmlas){
+  override def subst(s: AbstractSyntax.Subst) = {
+    And(fmlas.map(fmla => fmla.subst(s)))
   }
+}
 
+sealed abstract class Quantified extends Formula {
+  val vars: List[Variable]
+  val f: Formula
+
+  protected val head: Symbol
+
+  def variables() = vars ++ f.variables()
+  def freevars() = f.freevars().filter(v => vars.contains(v))
+
+  def quote() = List(head,
+		     vars.removeDuplicates.map(v => v.quote()),
+		     f.quote())
+}
+
+case class Exists(override val vars: List[Variable],
+		  override val f: Formula) extends Quantified {
+  /**
+   * assume the vars in s don't occur in vars.
+   * i.e. you can only substitute for free variables.
+   * TODO: assert this. */
+  def subst(s: AbstractSyntax.Subst) = Exists(vars, f.subst(s))
+
+  override val head = 'exists
+}
+
+case class Forall(override val vars: List[Variable],
+		  override val f: Formula) extends Quantified {
+  /**
+   * assume the vars in s don't occur in vars.
+   * i.e. you can only substitute for free variables.
+   * TODO: assert this. */
+  import AbstractSyntax.Subst
+  def subst(s: Subst) = Forall(vars, f.subst(s))
+
+  override val head = 'forall
+}
+
+
+/**
+ * Formula of an arbitrary first order logic.
+ *
+ * See <a href="http://en.wikipedia.org/wiki/First-order_logic#Terms"
+ * >Terms</a> in the wikipedia article.
+ *
+ * A Term is either a Variable or an Application, i.e. a function term.
+ */
+sealed abstract class Term() {
+  import AbstractSyntax.Subst
+
+  /**
+   * All variables occurring in this term.
+   */
+  def variables(): Iterable[Variable]
+
+  /**
+   * This term with the variables in s replaced by their values.
+   * TODO: document and test this better.
+   */
   def subst(s: Subst): Term
 
+  /**
+   * An symbolic expression for this term.
+   * TODO: consider renaming this to reify?
+   */
   def quote(): SExp = {
     this match {
-      case v: Variable => v.name
-      case c: Literal => List('quote, c.value)
       case a: Application => a.fun :: a.args.map(t => t.quote())
     }
   }
 }
 
 abstract class Variable() extends Term {
-  import Unifier.Subst
+  import AbstractSyntax.{Subst, lookup}
+  override def subst(s: Subst) = lookup(this, s)
+
+  override def variables() = List(this)
 
   def name: Symbol
-
-  import Unifier.lookup
-  override def subst(s: Subst): Term = lookup(this, s)
+  override def quote() = name
 }
 
 abstract class Application() extends Term {
   def fun: Any
   def args: List[Term]
+
+  override def variables() = args.flatMap(term => term.variables())
+  override def quote() = fun :: args.map(t => t.quote())
 }
 
+/**
+ * Literal terms act as 0-ary function terms.
+ */
 case class Literal(val value: Any) extends Application {
-  import Unifier.Subst
+  import AbstractSyntax.Subst
 
   override def fun = value
   override def args = Nil
   override def subst(s: Subst): Term = this
+
+  override def quote() = Atom(value)
 }
 
 case class Apply(sym: Symbol, terms: List[Term]) extends Application {
   override def fun = sym
   override def args = terms
 
-  import Unifier.Subst
-
+  import AbstractSyntax.Subst
   override def subst(s: Subst): Term = {
     /* don't make a new term unless we have to */
+    /* oops; premature optimization. */
     def each(tl: List[Term]): (Boolean, List[Term]) = {
       tl match {
 	case Nil => (false, Nil)
@@ -86,8 +172,16 @@ case class Apply(sym: Symbol, terms: List[Term]) extends Application {
   }
 }
 
-object Unifier {
+
+/**
+ * Unification, substitution, variable renaming, and related utilities.
+ * 
+ * TODO: look into prolog unification vs. sound first-order unification.
+ */
+object AbstractSyntax {
   /*
+   * Implementation is based on:
+   * 
    * Quick miniKanren-like code 
    * sokuza-kanren.scm,v 1.1 2006/05/10 23:12:41 oleg
    * http://okmij.org/ftp/Scheme/sokuza-kanren.scm
@@ -98,6 +192,11 @@ object Unifier {
 
   type Subst = Map[Variable, Term]
 
+  /**
+   * Deep/recursive lookup.
+   * i.e. if x is bound to y and y is bound to 1, then lookup(x) => 1.
+   * TODO: doctest this.
+   */
   def lookup(t: Term, s:Subst): Term = {
     t match {
       case v: Variable => {
@@ -139,81 +238,6 @@ object Unifier {
       }
     }
   }
-}
-
-
-
-sealed abstract class Formula() {
-  import Unifier.Subst
-
-  def variables(): List[Variable] = {
-    this match {
-      case NotNil(x) => x.variables()
-      case And(fl) => fl.flatMap(fmla => fmla.variables())
-      case Exists(vl, g) => vl ++ g.variables()
-      case Forall(vl, g) => vl ++ g.variables()
-    }
-  }
-
-  def freevars(): List[Variable] = {
-    this match {
-      case NotNil(x) => x.variables()
-      case And(fl) => fl.flatMap(fmla => fmla.freevars())
-      case Exists(vl, g) => g.freevars() filterNot (vl contains)
-      case Forall(vl, g) => g.freevars() filterNot (vl contains)
-    }
-  }
-
-  def subst(s: Subst): Formula = {
-    this match {
-      /* TODO: don't make a new formula unless we have to. */
-      case NotNil(x) => NotNil(x.subst(s))
-      case And(fl) => And(fl.map(fmla => fmla.subst(s)))
-
-      /* assume the vars in s don't occur in vl.
-       * i.e. you can only substitute for free variables.
-       * TODO: assert this. */
-      case Exists(vl, g) => Exists(vl, g.subst(s))
-      case Forall(vl, g) => Forall(vl, g.subst(s))
-    }
-  }
-
-  def quote(): SExp = {
-    this match {
-      /* This sorta promotes terms to formulas, which is like ACL2.
-       * But *unlike* ACL2, (and ...) is a formula, not a term,
-       * and the formulas below it may be quantified. Hmm.*/
-      case NotNil(term) => term.quote()
-      case And(fl) => 'and :: fl.map(f => f.quote())
-      case Exists(vl, g) => List('exists,
-				 vl.removeDuplicates.map(t => t.quote()),
-				 g.quote())
-      case Forall(vl, g) => List('forall,
-				 vl.removeDuplicates.map(t => t.quote()),
-				 g.quote())
-    }
-  }
-
-  override def toString(): String = this.quote().print()
-}
-
-/* reifying Not(Equal(term, NIL)) in scala is tedious...
- * perhaps an abstract Atom class of formulas? */
-case class NotNil(x: Term) extends Formula
-
-case class And(fmlas: List[Formula]) extends Formula
-//object Notation {
-  // not needed yet, and certainly not tested:
-  // def or(f: Formula, g: Formula) { Not(And(Not(f), Not(g))) }
-  // def implies(f: Formula, g: Formula) { Not(And(Not(f), g)) }
-//}
-
-case class Exists(vars: List[Variable], f: Formula) extends Formula
-case class Forall(vars: List[Variable], f: Formula) extends Formula
-
-
-object Simplifier {
-  import Unifier.Subst
 
   def renamevars(f: Formula, vl: List[Variable]): Formula = {
     f.subst(mksubst(vl, Nil, Map()))
@@ -248,6 +272,15 @@ object Simplifier {
 
 
 /* TODO: consider skolemization */
+/* SCRAP:
+ * largely following ACL2.
+ * 
+ * Matt Kaufmann and J Moore
+ * A Precise Description of the ACL2 Logic
+ * April, 1998.
+ * http://www.cs.utexas.edu/users/moore/publications/km97a.pdf
+ *
+ */
 /* look at defchoose in ACL2
  * 
  * Structured Theory Development for a Mechanized Logic,
