@@ -64,7 +64,7 @@ object SExp {
   def tailString(e: SExp): String = {
     e match {
       case Cons(h, t) => " " + h.print() + tailString(t)
-      case NIL => ")"
+      case NIL => ")" // TODO: linebreaks in sexp printing
       case _ => ". " + e.print()
     }
   }
