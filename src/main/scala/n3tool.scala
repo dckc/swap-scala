@@ -50,7 +50,7 @@ object N3Tool {
     import org.w3.swap.RDFXMLParser
 
     val e = XML.load(addr)
-    val p = new RDFXMLParser()
+    val p = new RDFXMLParser(addr) // @@TODO: absolutize base
     println(p.parse(e).quote().print())
   }
 }
