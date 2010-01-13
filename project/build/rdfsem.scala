@@ -13,6 +13,13 @@ class TestingProject(info: ProjectInfo) extends DefaultProject(info)
     "-g -unchecked -encoding us-ascii"
      .split(" ").map(CompileOption).toSeq ++ super.compileOptions
 
+  /* workaround for:
+   * scalac Parameter '-linksource' is not recognised by Scalac.
+   *
+   * ack: mharrah in #scala on Freenode
+   * */
+  override def documentOptions = Nil
+
   /*
    * val scalatest = "org.scalatest" % "scalatest" % "1.0" % "test->default"
    */

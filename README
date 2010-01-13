@@ -56,3 +56,31 @@ $ ls -sh ideaIC-9.0.tar.gz
 66M ideaIC-9.0.tar.gz
 
 http://jetbrains.net/confluence/display/SCA/Getting+Started+with+IntelliJ+IDEA+Scala+Plugin
+
+
+XML namespace handling -- clark notation (2.8 only?)
+
+profiling
+
+Getting Started with VisualVM
+https://visualvm.dev.java.net/gettingstarted.html
+
+null from System.console() when using >,x
+
+def vs val in combinator parsing
+
+patterns in for... constructible classes
+
+new scaladoc stylesheet makes links invisble and suppresses bullet points. not easy to scan.
+
+refs:
+
+java API docs
+
+scala API docs
+
+Programming in Scala book
+
+maybe dev tools belongs in advogato blog article?
+
+http://www.planetscala.com/

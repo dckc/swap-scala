@@ -1,11 +1,5 @@
 package org.w3.swap
 
-/*
- * based on
- * http://www.w.w3org/2000/10/swap/grammar/notation3.bnf
- * 1.14 2006/06/22 22:03:21
- */
-
 import java.math.BigDecimal
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
@@ -91,6 +85,38 @@ class N3Lex extends NTriplesLex {
   }
 }
 
+/**
+ * N3Parser builds a Formula from Notation3 text.
+ *
+ * This is a fairly straightforward transcription of
+ * <a href="http://www.w3.org/2000/10/swap/grammar/notation3.bnf"
+ * >notation3.bnf</a> (v1.14 2006/06/22 22:03:21) using
+ * <a href="http://www.artima.com/forums/flat.jsp?forum=276&thread=229061"
+ * >Scala Parser Combinators</a>. (see Chapter 31 Combinator Parsing
+ * in <cite>Programming in Scala</cite> by Odersky, Spoon, and Venners.)
+ *
+ * See also:
+ *
+ * <ul>
+ * <li>
+ * <cite><a href="http://www.w3.org/2000/10/swap/Primer"
+ * >Primer: Getting into RDF & Semantic Web using N3</a></cite>
+ * and
+ * </li>
+ * <li>
+ * <cite><a href="http://www.w3.org/DesignIssues/Notation3"
+ * >Notation3 (N3): A readable RDF syntax</a></cite>
+ *
+ * @param baseURI absolute URI to use to resolve relative URI references
+ *                for example:
+ *                val p = N3Parser("data:")
+ *                p.parseAll(p.document, "<#x> <#prop> 23")
+ *                (holds (data:#x) (data:#prop) 23)
+ *
+ *                see also URISyntax.combine
+ * 
+ * @author <a href="http://www.w3.org/People/Connolly/">Dan Connolly</a>
+ */
 class N3Parser(val baseURI: String) extends N3Lex {
   import logicalsyntax.{Formula, Exists, Forall, And,
 			Term, Variable, Apply, Literal}
