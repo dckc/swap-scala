@@ -5,11 +5,12 @@
 
 package org.w3.swap.rdf
 
-import org.w3.swap.logic.{Formula, Atomic, And, Exists,
-			  Term, Variable,
-			  Application, Apply, Literal,
-			  AbstractSyntax => Logic
-			}
+import org.w3.swap
+import swap.logic.{Formula, Atomic, And, Exists,
+		   Term, Variable,
+		   Application, Apply, Literal,
+		   AbstractSyntax => Logic
+		 }
 
 case class NotNil(x: Term) extends Atomic {
   import Logic.Subst
@@ -177,6 +178,9 @@ object AbstractSyntax {
    * didn't end up using it much.
    */
 
+/* TODO: move this to swap.logic.ExistentialConjuctiveFragment
+ * cf. http://en.wikipedia.org/wiki/Conjunctive_query
+ * */
 object Semantics {
   import Logic.{renamevars, mksubst}
   import AbstractSyntax.wellformed
@@ -226,9 +230,12 @@ object Semantics {
 	val shared = vf.toList intersect vg.toList
 	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
 	  val sub = mksubst(shared, Nil, Map())
-	  val t3 = sub.valuesIterator.toList
-	  val vg3:List[Variable] =  t3.map(t => t.asInstanceOf[Variable])
 	  val g3 = gg.subst(sub)
+	  val vg3: List[Variable] = for {
+	    t <- sub.valuesIterator.toList
+	    if t.isInstanceOf[Variable]
+	  } yield t.asInstanceOf[Variable]
+
 	  (vg3, g3)
 	}
 
@@ -241,12 +248,12 @@ object Semantics {
     }
   }
 
-  def conjoin2(f: Formula, g: Formula): Formula = {
+  protected def conjoin2(f: Formula, g: Formula): Formula = {
     (f, g) match {
       case (And(fl), And(gl)) => And(fl ++ gl)
-      case (NotNil(_), And(gl)) => And(List(f) ++ gl)
-      case (NotNil(_), NotNil(_)) => And(List(f, g))
-      case (_, _) => throw new Exception("illformed formula@@" + f.quote.print() + " g: " + g.quote.print())
+      case (x: Atomic, And(gl)) => And(List(f) ++ gl)
+      case (And(fl), x: Atomic) => And(fl ++ List(g))
+      case (_, _) => And(List(f, g))
     }
   }
 }

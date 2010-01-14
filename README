@@ -36,10 +36,11 @@ Testing Plan
  * standard RIF BLD entailment tests (http://www.w3.org/TR/rif-test/),
    which needs
    * RIF BLD XML reader
- * yosi's N3 syntax tests (optional), which needs
-   * N3 parser
+ * N3 syntax tests (http://www.w3.org/2000/10/swap/test/n3parser.tests), (opt)
+   which needs
+   * N3 parser (working; not feature-complete)
  * some sort of N3Logic proof testing, which needs
-   * N3Logic proof generator or N3 proof reader (and use cwm)
+   * N3Logic proof generator and/or N3 proof reader (and use cwm)
    * N3Logic proof checker
 
 

@@ -1,3 +1,4 @@
+package org.w3.swap.test
 
 import org.scalacheck._
 import Prop._
@@ -11,13 +12,14 @@ import Arbitrary.arbitrary
  */
 
 
-import org.w3.swap.rdf2004.AbstractSyntax.wellformed
+import org.w3.swap
+import swap.rdf.AbstractSyntax.wellformed
 
 object ent extends Properties("RDF 2004 Entailment") {
-  import org.w3.swap.logicalsyntax.{Formula, And}
-  import org.w3.swap.rdf2004.{URI, BlankNode}
-  import org.w3.swap.rdf2004.AbstractSyntax.{plain, text, data, checkterm, add}
-  import org.w3.swap.rdf2004.Semantics.entails
+  import swap.logic.{Formula, And}
+  import swap.rdf.{URI, BlankNode}
+  import swap.rdf.AbstractSyntax.{plain, text, data, checkterm, add}
+  import swap.rdf.Semantics.entails
 
   val genVar = for {
     n <- Gen.choose(1, 5)
@@ -102,8 +104,7 @@ object ent extends Properties("RDF 2004 Entailment") {
 }
 
 object ntp extends Properties("NTriples parsing") {
-  import org.w3.swap.NTriples
-  import org.w3.swap.SyntaxError
+  import swap.ntriples.NTriplesParser
 
   val genSubj = Gen.oneOf("<data:bob>", "<data:dan>",
 			  "_:x", "_:y", "_:z")
@@ -130,20 +131,13 @@ object ntp extends Properties("NTriples parsing") {
   def mkdoc(lines: List[(String, String, String)]): String = {
     val l = lines.map(t => t._1 + " " + t._2 + " " + t._3 + ".")
 
-    /* scalaQ: no list.join("\n") in the Scala lib? */
     l.mkString("", "\n", "\n")
   }
 
   property("gives well formed formula on good parse") = Prop.forAll(genLines){
     lines => {
-      try {
-	val f = new NTriples().toFormula(mkdoc(lines))
-	wellformed(f)
-      } catch {
-	case a: SyntaxError => true // bad text syntax; skip it
-
-	case other => throw other // scalaQ: no re-raise syntax?
-      }
+      val f = new NTriplesParser().toFormula(mkdoc(lines))
+      wellformed(f)
     }
   }
 }

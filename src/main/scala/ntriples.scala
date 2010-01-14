@@ -3,8 +3,9 @@ package org.w3.swap.ntriples
 /* Parsers brings magic such as ~ and ^^ */
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
-import org.w3.swap.logic.{Formula, And, Exists, Term}
-import org.w3.swap.rdf.{URI, BlankNode, AbstractSyntax, Vocabulary}
+import org.w3.swap
+import swap.logic.{Formula, And, Exists, Term}
+import swap.rdf.{URI, BlankNode, AbstractSyntax, Vocabulary}
 import AbstractSyntax.{atom, plain, data, text}
 
 
@@ -16,35 +17,33 @@ import AbstractSyntax.{atom, plain, data, text}
  * >section 3. N-Triples of <cite>RDF Test Cases</cite></a>.
  */
 class NTriplesParser extends NTriplesStrings {
-  def ntripleDoc: Parser[Formula] = phrase(rep(line)) ^^ {
-    case List() => And(List())
-    case atoms => {
+  /**
+   * Whitespace is explicit in the N-Triples grammar.
+   */
+  override def skipWhitespace = false
+
+  def ntripleDoc: Parser[Formula] = rep(line) ^^ {
+    case lines => {
+      val atoms = for(Some(f) <- lines) yield f
       val vars = atoms.flatMap(f => f.variables)
       if (vars.isEmpty) And(atoms)
       else { Exists(vars.toList.removeDuplicates, And(atoms)) }
     }
   }
 
-  /**
-   * Spec says: line  	::=  	ws* ( comment | triple )? eoln
-   * but we want to make sure we get a formula, so we skip
-   * until we get one
-   */
-  def line: Parser[Formula] = rep(ws_s | comment_eoln) ~> triple <~ eoln
+  def line: Parser[Option[Formula]] =
+    ws_s ~> opt( comment | triple ) <~ eoln ^^ {
+      case Some(maybef) => maybef
+      case None => None
+    }
+      
 
-  /**
-   * We'll handle whitespace explicitly.
-   */
-  override val whiteSpace = "".r
+  def comment: Parser[Option[Formula]] = """#[^\n\r]*""".r ^^ {
+    case _ => None }
 
-  /**
-   * combine comment and eoln
-   */
-  def comment_eoln: Parser[String] = "#[^\n\r]*(?:\n|\r|(?:\r\n))"
-
-  def triple: Parser[Formula] =
+  def triple: Parser[Option[Formula]] =
     subject ~ ws_p ~ predicate ~ ws_p ~ `object` <~ ws_s <~ "." <~ ws_s ^^ {
-    case s~_~p~_~o => atom(s, p, o)
+    case s~_~p~_~o => Some(atom(s, p, o))
   }
 
   def subject: Parser[Term] = uriref | nodeID
@@ -73,24 +72,27 @@ class NTriplesParser extends NTriplesStrings {
     case str => BlankNode(str, None)
   }
 
-  def literal: Parser[Term] = langString | datatypeString
-
   /**
    * Spec says: ws  	::=  	space | tab
    * This includes repetition
    */
-  def ws_p: Parser[String] = "[ \t]+"
-  def ws_s: Parser[String] = "[ \t]*"
+  def ws_p: Parser[String] = """[ \t]+""".r
+  def ws_s: Parser[String] = """[ \t]*""".r
 
-  def eoln: Parser[String] = """\n|\r|(?:\r\n)""".r
+  def eoln: Parser[String] = """\r|\n|(?:\r\n)""".r
 
   /**
    * TODO: move this to test code.
    */
   def toFormula(doc: String): Formula = {
+    import swap.logic.Forall
+
     this.parseAll(ntripleDoc, doc) match {
       case Success(f, _) => f
-      case _ => And(Nil)
+      case other => {  // not RDF
+	println("@@syntax error in toFormula" + other)
+	Forall(Nil, And(Nil))
+      }
     }
   }
 
@@ -98,19 +100,21 @@ class NTriplesParser extends NTriplesStrings {
 
 /* this is factored out for re-use in n3 */
 class NTriplesStrings extends RegexParsers {
-  /* fold in language */
-  def langString: Parser[Term] =
-    "\"[^\"\r\n]+\"".r ~ opt("@[a-z]+(-[a-z0-9]+)*".r) ^^ {
-      case str ~ None => plain(dequote(str))
-      case str ~ Some(code) => text(dequote(str), code.substring(1))
-    }
+  def literal: Parser[Term] = string ~ opt("@"~language | "^^"~datatype) ^^ {
+    case str ~ None => plain(dequote(str))
 
-  def datatypeString: Parser[Term] =
-    "\"[^\"\n]+\"".r ~ "^^" ~ "<[^>]+>".r ^^ {
-      case value~_~dt => data(value, mkuri(dt))
-    }
+    case str ~ Some("@" ~ lang) => text(dequote(str), lang.substring(1))
 
-  protected def mkuri(str: String) = new URI(dequote(str))
+    case lex ~ Some("^^" ~ dt) => data(lex, mkuri(dt))
+  }
+
+  def string: Parser[String] = "\"[^\"\n]+\"".r ^^ { case s => dequote(s) }
+
+  def language: Parser[String] = "[a-z]+(-[a-z0-9]+)*".r
+
+  def datatype: Parser[String] = "^^<[^>]+>".r
+
+  protected def mkuri(str: String) = URI(dequote(str))
 
   protected def dequote(str: String) = {
     assert(!str.contains("\\"), "TODO: escapes in URIs, strings")

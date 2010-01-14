@@ -1,12 +1,15 @@
-package org.w3.swap
+package org.w3.swap.test
 
 import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
-import logicalsyntax.{Formula, NotNil, And, Exists,
-		      Term, Variable, Literal, Apply }
+import org.w3.swap
 
 class LogicSyntax extends Spec with ShouldMatchers {
+  import swap.logic.{Formula, And, Exists,
+		     Term, Variable, Literal, Apply }
+  import swap.rdf.NotNil  // TODO: make our own Atomic class
+
   case class V(n: Symbol) extends Variable {
     override def name = n
   }
@@ -23,11 +26,11 @@ class LogicSyntax extends Spec with ShouldMatchers {
 			    NotNil(Apply('sqrt, List(4))) )) )
 
     it("should represent formulas"){
-      (f.toString()) should equal ("(exists (x y) (and x y (nil) '2 (sqrt '4)))")
+      (f.toString()) should equal ("(exists (x y) (and x y (nil) 2 (sqrt 4)))")
     }
 
     it("should find variables"){
-      (f.variables.removeDuplicates) should equal (
+      (f.variables.toList.removeDuplicates) should equal (
 	List(V('x), V('y))
       )
     }
@@ -35,21 +38,22 @@ class LogicSyntax extends Spec with ShouldMatchers {
 }
 
 class RDFSyntax extends Spec with ShouldMatchers {
-  import rdf2004.{BlankNode, URI}
-  import rdf2004.AbstractSyntax.{atom, add, plain}
+  import swap.logic.Term
+  import swap.rdf.{BlankNode, URI}
+  import swap.rdf.AbstractSyntax.{atom, add, plain}
 
   describe("triples as atomic formulas") {
     val t1 = atom(URI("data:bob"), URI("data:name"), plain("Bob"))
 
     it ("should convert RDF triple Atoms to strings reasonably") {
       (t1.toString()) should equal (
-	"(holds (data:bob) (data:name) '\"Bob\")"
+	"(holds (data:bob) (data:name) \"Bob\")"
       )
     }
 
     it ("should convert to S-Expression reasonably") {
       (t1.quote().print()) should equal (
-	"(holds (data:bob) (data:name) '\"Bob\")"
+	"(holds (data:bob) (data:name) \"Bob\")"
       )
     }
   }
@@ -92,10 +96,12 @@ class RDFSyntax extends Spec with ShouldMatchers {
 }
 
 class RDFSemantics extends Spec with ShouldMatchers {
-  import rdf2004.{BlankNode, URI}
-  import rdf2004.AbstractSyntax.{plain}
-  import rdf2004.Semantics.{entails, conjoin}
-  import logicalsyntax.Unifier.{unify}
+  import swap.rdf.{BlankNode, URI}
+  import swap.rdf.AbstractSyntax.{plain}
+  import swap.ntriples.NTriplesParser
+  import swap.rdf.Semantics.{entails, conjoin}
+  import swap.logic.{Term, Apply, And}
+  import swap.logic.AbstractSyntax.unify
 
   val vhome = BlankNode("home", Some(1))
   val tbob: Term = URI("data:bob")
@@ -111,12 +117,20 @@ class RDFSemantics extends Spec with ShouldMatchers {
     )
   }
 
-  def mkf(s: String) = new NTriples().toFormula(s)
+  def mkf(s: String) = new NTriplesParser().toFormula(s)
 
   describe ("Semantics: Conjunction (aka merge)") {
-    val and2 = conjoin(mkf("""<data:bob> <data:home> <data:x> .
-			   <data:dan> <data:home> <data:Austin>."""),
-		       mkf("<data:x> <data:in> <data:tx> .") )
+    val and2 = conjoin(mkf("""#
+<data:bob> <data:home> <data:x> .
+<data:dan> <data:home> <data:Austin>.
+"""),
+		       mkf("<data:x> <data:in> <data:tx> .\n") )
+    it("should result in a conjuction of 3 atoms"){
+      and2 match {
+	case And(fmlas) => fmlas.toList.length should equal (3)
+	case _ => and2 should not equal (And(List()))
+      }
+    }
     it("should work on this formula"){
       (and2.quote().print()) should equal(
  "(and (holds (data:bob) (data:home) (data:x)) (holds (data:dan) (data:home) (data:Austin)) (holds (data:x) (data:in) (data:tx)))"
@@ -124,69 +138,91 @@ class RDFSemantics extends Spec with ShouldMatchers {
     }
 
     it("should do renaming when necessary"){
-      val f = mkf("<data:bob> <data:home> _:somewhere .")
+      val f = mkf("<data:bob> <data:home> _:somewhere .\n")
       ( conjoin(f, f).quote.print()
-     ) should equal("(exists (_:somewhere '_:somewhere.2) (and (holds (data:bob) (data:home) _:somewhere) (holds (data:bob) (data:home) '_:somewhere.2)))")
+     ) should equal("(exists (_:somewhere _:somewhere.2) (and (holds (data:bob) (data:home) _:somewhere) (holds (data:bob) (data:home) _:somewhere.2)))")
     }
   }
 
   describe ("Entailment") {
     it("should handle X |= X for atomic, ground X") {
-      ( entails(mkf("<data:bob> <data:home> <data:Texas> ."),
-		mkf("<data:bob> <data:home> <data:Texas> ."))
+      ( entails(mkf("<data:bob> <data:home> <data:Texas> .\n"),
+		mkf("<data:bob> <data:home> <data:Texas> .\n"))
      ) should equal (true)
     }
     it("should handle A |= Ex x A/x ") {
-      ( entails(mkf("<data:bob> <data:home> <data:Texas> ."),
-		mkf("<data:bob> <data:home> _:somewhere ."))
+      ( entails(mkf("<data:bob> <data:home> <data:Texas> .\n"),
+		mkf("<data:bob> <data:home> _:somewhere .\n"))
      ) should equal (true)
     }
     it("should *not* think that A |= B for distinct ground A, B") {
-      ( entails(mkf("<data:bob> <data:home> <data:Texas> ."),
-		mkf("<data:sally> <data:home> <data:Texas> ."))
+      ( entails(mkf("<data:bob> <data:home> <data:Texas> .\n"),
+		mkf("<data:sally> <data:home> <data:Texas> .\n"))
      ) should equal (false)
     }
 
     it("should handle A^B |= Ex v (A^B)/v") {
-      (entails(mkf("""<data:dan> <data:home> <data:Austin>.
-		  <data:Austin> <data:in> <data:Texas>."""),
-	       mkf("""<data:dan> <data:home> _:somewhere.
-		  _:somewhere <data:in> <data:Texas>."""))
+      (entails(mkf("""#
+<data:dan> <data:home> <data:Austin>.
+<data:Austin> <data:in> <data:Texas>.
+"""),
+	       mkf("""#
+<data:dan> <data:home> _:somewhere.
+ _:somewhere <data:in> <data:Texas>.
+"""))
      ) should equal (true)
     }
 
     it("should *not* think that A^B |= Ex v (A^C)/v") {
-      ( entails(mkf("""<data:dan> <data:home> <data:Austin>.
-		    <data:Dallas> <data:in> <data:Texas>."""),
-		mkf("""<data:dan> <data:home> _:somewhere.
-		  _:somewhere <data:in> <data:Texas>."""))
+      ( entails(mkf("""#
+<data:dan> <data:home> <data:Austin>.
+<data:Dallas> <data:in> <data:Texas>.
+"""),
+		mkf("""#
+<data:dan> <data:home> _:somewhere.
+_:somewhere <data:in> <data:Texas>.
+"""))
      ) should equal (false)
     }
 
     it("should handle 2 bindings for v1, 1 for v2") {
-      ( entails(mkf("""<data:dan> <data:home> <data:Austin>.
-		    <data:bob> <data:home> <data:Austin>."""),
-		mkf("""_:somebody <data:home> _:somewhere."""))
+      ( entails(mkf("""#
+<data:dan> <data:home> <data:Austin>.
+<data:bob> <data:home> <data:Austin>.
+"""),
+		mkf("_:somebody <data:home> _:somewhere.\n"))
      ) should equal (true)
     }
 
     it("should handle variable loops, out-of-order triples") {
-      ( entails(mkf("""<data:bob> <data:home> <data:Dallas>.
-		    <data:bob> <data:visited> <data:Texas>.
-		    <data:Dallas> <data:in> <data:Texas>."""),
-		mkf("""_:somebody <data:home> _:somewhere.
-		    _:somewhere <data:in> _:where.
-		    _:somebody <data:visited> _:where."""))
+      ( entails(mkf("""#
+<data:bob> <data:home> <data:Dallas>.
+<data:bob> <data:visited> <data:Texas>.
+<data:Dallas> <data:in> <data:Texas>.
+"""
+		  ),
+		mkf("""#
+_:somebody <data:home> _:somewhere.
+_:somewhere <data:in> _:where.
+ _:somebody <data:visited> _:where.
+"""
+		  ))
      ) should equal (true)
     }
 
     it("should notice one extra character") {
-      ( entails(mkf("""<data:boob> <data:home> <data:Dallas>.
-		    <data:bob> <data:visited> <data:Texas>.
-		    <data:Dallas> <data:in> <data:Texas>."""),
-		mkf("""_:somebody <data:home> _:somewhere.
-		    _:somewhere <data:in> _:where.
-		    _:somebody <data:visited> _:where."""))
+      ( entails(mkf("""#
+<data:boob> <data:home> <data:Dallas>.
+<data:bob> <data:visited> <data:Texas>.
+<data:Dallas> <data:in> <data:Texas>.
+"""
+		  ),
+		mkf("""#
+_:somebody <data:home> _:somewhere.
+ _:somewhere <data:in> _:where.
+_:somebody <data:visited> _:where.
+"""
+		  ))
      ) should equal (false)
     }
 

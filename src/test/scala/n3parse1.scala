@@ -8,10 +8,10 @@ import org.scalacheck._
 import Prop._
 import Arbitrary.arbitrary
 
+import org.w3.swap
 
 object numberLex extends Properties("N3 tokenization") {
-  import org.w3.swap.N3Lex
-  import org.w3.swap.QName
+  import swap.n3.{N3Lex, QName}
 
   case class IO(in: String, out: List[Any])
 
@@ -79,11 +79,10 @@ object numberLex extends Properties("N3 tokenization") {
 }
 
 object n3parsing extends Properties("N3 Parsing") {
-  import org.w3.swap.logicalsyntax.{Formula, Exists, And, NotNil,
-				    Apply, Literal}
-  import org.w3.swap.rdf2004.{URI, BlankNode}
-  import org.w3.swap.N3Parser
-  import org.w3.swap.N3AbstractSyntax.atom
+  import org.w3.swap.logic.{Formula, Exists, And, Apply, Literal}
+  import org.w3.swap.rdf.{URI, BlankNode, NotNil}
+  import org.w3.swap.n3.N3Parser
+  import org.w3.swap.n3.AbstractSyntax.atom
 
   case class IO(in: String, out: Formula)
 

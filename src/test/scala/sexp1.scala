@@ -4,7 +4,8 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 class SExpTest extends Spec with ShouldMatchers {
-  import SExp.{NIL}
+  import sexp.Cons
+  import sexp.SExp.{NIL}
 
   describe("SExp"){
     it("should convert a simple s-exp to a string"){

@@ -15,6 +15,8 @@ case class EVar(n: Symbol) extends Variable {
   override def name = n
 }
 
+case class QName(pfx: String, ln: String)
+
 /* TODO: bugfix: re-using NTriplesStrings allows extra spaces,
  * e.g. "abc"@ en and "10" ^^<data:#int>
  * TODO: oops! ntriples doesn't allow qnames in datatype literals
@@ -45,8 +47,6 @@ class N3Lex extends org.w3.swap.ntriples.NTriplesStrings {
     }
 
   // TODO: non-ASCII name characters
-
-  case class QName(pfx: String, ln: String)
 
   /* note _:xyz is an evar but _a:xyz is a qname */
   val prefix_re = """(?:((?:_[A-Za-z0-9_]+)|(?:[A-Za-z][A-Za-z0-9_]*)|):)"""
@@ -104,7 +104,11 @@ class N3Lex extends org.w3.swap.ntriples.NTriplesStrings {
  * <li>
  * <cite><a href="http://www.w3.org/DesignIssues/Notation3"
  * >Notation3 (N3): A readable RDF syntax</a></cite>
- *
+ * </li>
+ * <li><a href="http://www.w3.org/2000/10/swap/test/n3parser.tests"
+ * >n3parser.tests</a> in <a href="http://www.w3.org/2000/10/swap/"
+ * >python swap</a>
+ * </ul>
  * @param baseURI absolute URI to use to resolve relative URI references
  *                for example:
  *                val p = N3Parser("data:")
@@ -119,6 +123,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
   import org.w3.swap.logic.{Formula, Exists, Forall, And,
 			    Term, Variable, Apply, Literal}
   import org.w3.swap.rdf.BlankNode
+  import org.w3.swap.rdf.AbstractSyntax.{text, data}
   import AbstractSyntax.atom
 
   import scala.collection.mutable
@@ -132,7 +137,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
 		    new mutable.Stack(),
 		    new mutable.Stack()))
 
-  def document: Parser[Formula] = phrase(rep(statement <~ ".")) ^^ {
+  def document: Parser[Formula] = rep(statement <~ ".") ^^ {
     case sts => mkFormula(scopes.top.statements.toList.reverse)
   }
 
@@ -209,7 +214,7 @@ class N3Parser(val baseURI: String) extends N3Lex {
     }
     
 
-  val property: Parser[List[(Term, Term, Boolean)]] = (
+  def property: Parser[List[(Term, Term, Boolean)]] = (
     // TODO: with keywords, this becomes @has
     opt("has") ~> term ~ repsep(term, ",") ^^ {
       case t2 ~ tn => tn.map(ti => (t2, ti, false))
@@ -254,27 +259,30 @@ class N3Parser(val baseURI: String) extends N3Lex {
     | "=" ^^ {
       case s => URI("http://www.w3.org/2002/07/owl#sameAs") }
     /* 
-    | "=>" ^^ {
-      case s => URI("http://www.w3.org/2000/10/swap/log#implies") }
-      */
+     | "=>" ^^ {
+     case s => URI("http://www.w3.org/2000/10/swap/log#implies") }
+     */
   )
 
-  // N3, turtle, SPARQL have numeric, boolean literals too
-  val literal: Parser[Term] = (
+    // N3, turtle, SPARQL have numeric, boolean literals too
+  override def literal: Parser[Term] = (
     // TODO: can langString and datatypeString use """s too?
-    langString | datatypeString
+    // TODO: left factor string-handling.
+    string ~ "^^" ~ datatype ^^ { case lex~_~dt => data(lex, mkuri(dt)) }
+    | string ~ "@" ~ language ^^ { case s~_~lang => text(s, lang) }
+    | string ^^ { case s => Literal(s) }
     | stringLit3 ^^ { case s => Literal(s) }
     | numeral
     | boolean
     )
 
-  val numeral: Parser[Term] = (
+  def numeral: Parser[Term] = (
     double ^^ { case x => Literal(x) }
     | decimal ^^ { case x => Literal(x) }
     | integer ^^ { case i => Literal(i) }
     )
 
-  val boolean: Parser[Term] = (
+  def boolean: Parser[Term] = (
     // TODO: with keywords, this is "@true" and "@false"
     "true" ^^ { case b => Literal(true) }
     | "fase" ^^ { case b => Literal(false) }

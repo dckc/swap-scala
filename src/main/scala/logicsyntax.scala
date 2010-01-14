@@ -1,5 +1,8 @@
 package org.w3.swap.logic
-import org.w3.swap.{SExp, Atom}
+
+import org.w3.swap
+import swap.sexp.{SExp, Atom, Cons}
+import swap.sexp.SExp.fromList
 
 /**
  * Formula of an arbitrary first order logic.
@@ -32,7 +35,8 @@ abstract class Unary(f: Formula) extends Formula
 abstract class Binary(f: Formula, g: Formula) extends Formula
 abstract class Nary(val connective: Symbol,
 		    val fl: Iterable[Formula]) extends Formula {
-  override def quote() = connective :: fl.toList.map(f => f.quote())
+  override def quote() = Cons(connective,
+			      fromList(fl.toList.map(f => f.quote())) )
 
   override def variables() = fl.flatMap(fmla => fmla.variables())
   override def freevars() = fl.flatMap(fmla => fmla.freevars())
@@ -53,9 +57,9 @@ sealed abstract class Quantified extends Formula {
   def variables() = vars ++ f.variables()
   def freevars() = f.freevars().filter(v => vars.contains(v))
 
-  def quote() = List(head,
-		     vars.removeDuplicates.map(v => v.quote()),
-		     f.quote())
+  def quote() = fromList(List(head,
+			      vars.removeDuplicates.map(v => v.quote()),
+			      f.quote()))
 }
 
 case class Exists(override val vars: List[Variable],
@@ -108,11 +112,7 @@ sealed abstract class Term() {
    * An symbolic expression for this term.
    * TODO: consider renaming this to reify?
    */
-  def quote(): SExp = {
-    this match {
-      case a: Application => a.fun :: a.args.map(t => t.quote())
-    }
-  }
+  def quote(): SExp
 }
 
 abstract class Variable() extends Term {
@@ -130,7 +130,9 @@ abstract class Application() extends Term {
   def args: List[Term]
 
   override def variables() = args.flatMap(term => term.variables())
-  override def quote() = fun :: args.map(t => t.quote())
+  override def quote(): SExp = {
+    Cons(Atom(fun), fromList(args.map(t => t.quote())))
+  }
 }
 
 /**
@@ -261,7 +263,7 @@ object AbstractSyntax {
     val names = taken.map(v => v.name)
     val pfx = v.name
     def trynext(n: Int): Variable = {
-      val name = Symbol(pfx + "." + n.toString())
+      val name = Symbol(pfx.name + "." + n.toString())
       if (names.indexOf(name) < 0) Var(name)
       else trynext(n+1)
     }

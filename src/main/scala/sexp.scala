@@ -1,4 +1,4 @@
-package org.w3.swap
+package org.w3.swap.sexp
 
 sealed abstract class SExp {
   def print(): String
@@ -8,6 +8,7 @@ sealed abstract class SExp {
 case class Cons(head: SExp, tail: SExp) extends SExp {
   import SExp.tailString
 
+  // TODO: optimize with StringBuilder or something.
   override def print() = {
     head match {
       case Atom('quote) => {
@@ -43,7 +44,7 @@ case class Atom(x: Any) extends SExp {
 object SExp {
   val NIL = Atom('NIL)
 
-  implicit def fromList(items: List[Any]): SExp = {
+  def fromList(items: List[Any]): SExp = {
     items match {
       case Nil => NIL
       case hd :: tl => {
@@ -59,8 +60,7 @@ object SExp {
 
   implicit def fromSymbol(s: Symbol): SExp = Atom(s)
 
-  /* scalaQ: private?
-   * scalaQ: doesn't depend on head/tail; move out of this class somehow? */
+  /* scalaQ: private? */
   def tailString(e: SExp): String = {
     e match {
       case Cons(h, t) => " " + h.print() + tailString(t)
