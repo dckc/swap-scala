@@ -43,7 +43,7 @@ object Util {
    * @param base an absolute URI
    * @param ref any URI
    * 
-   * @returns per section 5. Reference Resolution of RFC3986
+   * @return per section 5. Reference Resolution of RFC3986
    * 
    * @throws java.text.ParseException if base isn't an absoluteURI
    */
