@@ -58,9 +58,17 @@ object DocTest {
    */
   def examples(s: String): Iterator[Example] = {
     example_re.findAllIn(s).matchData.map(m => {
-      val indent = m.group("indent")
-      val source = ("|" + m.group("source")).stripMargin
-      val want = m.group("want") // TODO: handle indent in want
+      val indent = m.group("indent").length
+      val source_lines = m.group("source").split("\\\n")
+      val want_lines = m.group("want").split("\\\n")
+
+      // TODO: check that each prompt is followed by a space.
+      val l = "scala> ".length
+      val source = (source_lines.map(sl => sl.substring(indent+l))
+		    ).mkString("\n")
+      val want = (want_lines.map(wl => wl.substring(indent))
+		).mkString("\n")
+      
       Example(source, want)
     })
   }
