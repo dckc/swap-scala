@@ -25,22 +25,25 @@ object DocTest {
   def makeTestSuite(pkg: String, source: String) {
     println("package " + pkg)
     println()
-    println("object DocTestSuite {")
+    println("import org.scalatest.FunSuite")
+    println("import org.scalatest.matchers.ShouldMatchers")
+    println()
+    println("object DocTestSuite extends FunSuite with ShouldMatchers {")
     println()
 
     var i = 0
     for (ex <- examples(source)) {
       i += 1
       
-      println("  def test" + i + "(): Boolean = {")
+      println("  test(\"" + i + " TODO: test names.\") {")
       println("    //@@TODO: what to import?")
       println("    val actual = (")
       for (line <- ex.source.split("\\\n"))
 	println("      " + line)
       println("    )")
       println()
-      println("    actual.isTypeOf[" + ex.wantType + "] && ")
-      println("      actual.toString == " + quote(ex.want))
+      println("    actual.isTypeOf[" + ex.wantType + "] should equal (true) ")
+      println("    actual.toString should equal == (" + quote(ex.want) + ")")
       println("  }")
       println()
     }
