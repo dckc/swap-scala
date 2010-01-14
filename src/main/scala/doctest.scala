@@ -23,7 +23,7 @@ object DocTest {
     }
   }
 
-  case class Example(code: String, output: String)
+  case class Example(source: String, want: String)
 
   /*
    * cribbed from:
@@ -31,21 +31,19 @@ object DocTest {
    * Module doctest.
    * Released to the public domain 16-Jan-2001, by Tim Peters (tim@python.org).
    *
-   * TODO: convert from >>> to scala>
-   * TODO: allow * as well as space before scala>
    */
-  val example_re = new Regex("""(?mx: # mx = MULTILINE | COMMENTS
+  protected val example_re = new Regex("""(?mx: # mx = MULTILINE | COMMENTS
         # Source consists of a PS1 line followed by zero or more PS2 lines.
         (
-            (?:^(           [\x20]*) >>>    .*)    # PS1 line
-            (?:\n           [\x20]*  \.\.\. .*)*)  # PS2 lines
+            (?:^(           [\x20\*]*) scala>    .*)    # PS1 line
+            (?:\n           [\x20\*]*      \|    .*)*)  # PS2 lines
         \n?
         # Want consists of any non-blank lines that do not start with PS1.
-        (         (?:(?![\x20]*$)    # Not a blank line
-                     (?![\x20]*>>>)  # Not a line starting with PS1
+        (         (?:(?![\x20\*]*$)    # Not a blank line
+                     (?![\x20\*]*\|)   # Not a line starting with PS1
                      .*$\n?       # But any other line
                   )*)
-        )""")
+        )""", "source", "indent", "want")
 
   /**
    * Find scala REPL examples. They take the form:
@@ -56,11 +54,15 @@ object DocTest {
    * scala> (1 +
    *      | 2)
    * res0: Int = 3
+   * 
    */
   def examples(s: String): Iterator[Example] = {
-    /* TODO: use group names rather than group numbers. */
-    /* TODO: handle indent, | */
-    example_re.findAllIn(s).matchData.map(m => Example(m.group(1), m.group(3)))
+    example_re.findAllIn(s).matchData.map(m => {
+      val indent = m.group("indent")
+      val source = ("|" + m.group("source")).stripMargin
+      val want = m.group("want") // TODO: handle indent in want
+      Example(source, want)
+    })
   }
 }
 
