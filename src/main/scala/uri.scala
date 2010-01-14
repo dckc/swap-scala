@@ -77,8 +77,12 @@ object Util {
   /**
    * 5.2.3. Merge Paths
    */
-  protected def merge(abase: String, pbase: String, pref: String): String = {
-    if (abase != null && pbase == "") "/" + pref else {
+  protected def merge(auth: String, pbase: String, pref: String): String = {
+    assert(! pref.startsWith("/"))
+
+    if (pbase == "") {
+      if (auth != null) ("/" + pref) else pref
+    } else {
       merge2(dirname(pbase), pref)
     }
   }
