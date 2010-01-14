@@ -1,6 +1,8 @@
 package org.w3.swap.qa
 
+import scala.util.matching.Regex
 import java.io.{File, BufferedInputStream, FileInputStream}
+
 
 /**
  * Find scala example/test cases and make them executable.
@@ -29,13 +31,21 @@ object DocTest {
    * Module doctest.
    * Released to the public domain 16-Jan-2001, by Tim Peters (tim@python.org).
    *
-   * What a pain that java/scala doesn't do re.VERBOSE. Oops! It does!
-   * http://java.sun.com/javase/6/docs/api/java/util/regex/Pattern.html#COMMENTS
-   * TODO: revert this regex back to VERBOSE/COMMENTS style.
+   * TODO: convert from >>> to scala>
+   * TODO: allow * as well as space before scala>
    */
-  val example_re = (
-    """((?:(^[ \*]*)scala> .*)(?:\n[ \*]*| .*))""" +
-    """((?:(?![ \*]*$)(?![ \*]*scala>).*$\n?))""").r
+  val example_re = new Regex("""(?mx: # mx = MULTILINE | COMMENTS
+        # Source consists of a PS1 line followed by zero or more PS2 lines.
+        (
+            (?:^(           [\x20]*) >>>    .*)    # PS1 line
+            (?:\n           [\x20]*  \.\.\. .*)*)  # PS2 lines
+        \n?
+        # Want consists of any non-blank lines that do not start with PS1.
+        (         (?:(?![\x20]*$)    # Not a blank line
+                     (?![\x20]*>>>)  # Not a line starting with PS1
+                     .*$\n?       # But any other line
+                  )*)
+        )""")
 
   /**
    * Find scala REPL examples. They take the form:
@@ -48,7 +58,9 @@ object DocTest {
    * res0: Int = 3
    */
   def examples(s: String): Iterator[Example] = {
-    example_re.findAllIn(s).matchData.map(m => Example(m.group(1), m.group(2)))
+    /* TODO: use group names rather than group numbers. */
+    /* TODO: handle indent, | */
+    example_re.findAllIn(s).matchData.map(m => Example(m.group(1), m.group(3)))
   }
 }
 
