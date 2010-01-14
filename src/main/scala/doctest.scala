@@ -22,6 +22,14 @@ object DocTest {
     }
   }
 
+  /**
+   * Print a test suite by finding examples in source text.
+   * @param pkg package of the resulting test suite
+   *
+   * Resulting test suite extends <a href=
+   * "http://www.scalatest.org/getting_started_with_fun_suiteFunSuite"
+   * >scalatests' FunSuite</a>.
+   */
   def makeTestSuite(pkg: String, source: String) {
     println("package " + pkg)
     println()
