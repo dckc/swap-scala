@@ -11,6 +11,37 @@ Goals
  * Influence Pat Hayes's RDF semantics advocacy around "named graphs" and such
  * Implement N3Logic proof checking independent of cwm
 
+Testing Plan
+ * standard RDF entailment tests, which need
+   * RDF/XML parser (working; not feature-complete)
+   * n-triples parser (working; not feature-complete)
+   * RDF proof generator, or
+     * N3 proof reader and use cwm to generate proofs
+   * RDF proof checker (entailment method is done)
+     Currently, we have an RDF entailment method, though some questions
+     about variable handling remain.
+ * standard RDF positive/negative syntax tests (optional)
+ * Dave's turtle syntax tests (optional), which needs
+   * turtle parser or perhaps just
+     * N3 parser (working; feature complete for turtle high level structures,
+       but not low-level details such as string escaping)
+   * RDF entailment method
+ * standard RDFS tests, which needs
+   * RDF/XML parser
+   * n-triples parser
+   * RDFS rules in N3Rules
+   * N3Rules proof generator, or
+     * N3 proof reader
+   * N3Rules proof checker
+ * standard RIF BLD entailment tests (http://www.w3.org/TR/rif-test/),
+   which needs
+   * RIF BLD XML reader
+ * yosi's N3 syntax tests (optional), which needs
+   * N3 parser
+ * some sort of N3Logic proof testing, which needs
+   * N3Logic proof generator or N3 proof reader (and use cwm)
+   * N3Logic proof checker
+
 
 directory layout is a la sbt/maven
 http://code.google.com/p/simple-build-tool/wiki/Setup
