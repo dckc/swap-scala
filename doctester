@@ -1,0 +1,9 @@
+#!/bin/sh
+
+RDFSEM=/home/connolly/projects/rdfsem
+SCALAVER=2.8.0.Beta1-RC5
+SCALALIB=$RDFSEM/project/boot/scala-$SCALAVER/lib/scala-library.jar
+TARGET=$RDFSEM/target/scala_$SCALAVER/classes
+JAVA=java
+#JAVA="java -Xprof"
+$JAVA -cp $SCALALIB:$TARGET org.w3.swap.qa.DocTest "$@"
