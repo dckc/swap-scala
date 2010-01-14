@@ -2,7 +2,7 @@ package org.w3.swap.qa
 
 import scala.util.matching.Regex
 import java.io.{File, BufferedInputStream, FileInputStream}
-
+import java.text.ParseException
 
 /**
  * Find scala example/test cases and make them executable.
@@ -12,18 +12,48 @@ import java.io.{File, BufferedInputStream, FileInputStream}
  * @author Dan Connolly
  */
 object DocTest {
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]) {
     import FileUtil.contents
 
-    println("@@TODO: something about scope/import")
-    println("@@TODO: find part of scala REPL that does printing")
-    for (ex <- examples(contents(args(0)))) {
-      println(ex)
-      println("@@TODO: convert ex to scala code")
+    if (args.length == 2) {
+      makeTestSuite(args(0), contents(args(1)))
+    } else {
+      println("Usage: doctest package.name input_file_name")
     }
   }
 
-  case class Example(source: String, want: String)
+  def makeTestSuite(pkg: String, source: String) {
+    println("package " + pkg)
+    println()
+    println("object DocTestSuite {")
+    println()
+
+    var i = 0
+    for (ex <- examples(source)) {
+      i += 1
+      
+      println("  def test" + i + "(): Boolean = {")
+      println("    //@@TODO: what to import?")
+      println("    val actual = (")
+      for (line <- ex.source.split("\\\n"))
+	println("      " + line)
+      println("    )")
+      println()
+      println("    actual.isTypeOf[" + ex.wantType + "] && ")
+      println("      actual.toString == " + quote(ex.want))
+      println("  }")
+      println()
+    }
+    println("}")
+  }
+
+  def quote(s: String): String = {
+    assert(!s.contains("\""), "TODO: quote \" chars")
+    val q3 = "\"\"\""
+    q3 + s + q3
+  }
+
+  case class Example(source: String, wantType: String, want: String)
 
   /*
    * cribbed from:
@@ -66,10 +96,18 @@ object DocTest {
       val l = "scala> ".length
       val source = (source_lines.map(sl => sl.substring(indent+l))
 		    ).mkString("\n")
-      val want = (want_lines.map(wl => wl.substring(indent))
-		).mkString("\n")
-      
-      Example(source, want)
+      val want3 = (want_lines.map(wl => wl.substring(indent))
+		 ).mkString("\n")
+
+      // split res0: Int = 3
+      // into Int and 3
+      val xtv = want3.split(" = ", 2)
+      if (xtv.length == 2) {
+	val xt = xtv(0).split(": ", 2)
+	if (xt.length == 2) {
+	  Example(source, xt(1), xtv(1))
+	} else throw new ParseException("expected resN: type = val", 0)
+      } else throw new ParseException("expected resN: type = val", 0)
     })
   }
 }
