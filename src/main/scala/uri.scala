@@ -5,9 +5,9 @@ import java.text.ParseException
 /**
  * Path operations on URIs.
  * 
- * syntactic operations on URIs shouldn't be all intertwingled
+ * Syntactic operations on URIs shouldn't be all intertwingled
  * with network operations like GET and POST, as 
- * java.net.URL does.
+ * java.net.URL does. (oops! looks like I missed java.net.URI)
  *
  * There's no reason to get:
  * 
