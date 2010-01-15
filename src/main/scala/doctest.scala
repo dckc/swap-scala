@@ -1,7 +1,6 @@
 package org.w3.swap.qa
 
 import scala.util.matching.Regex
-import java.io.{File, BufferedInputStream, FileInputStream}
 import java.text.ParseException
 
 /**
@@ -13,7 +12,11 @@ import java.text.ParseException
  */
 object DocTest {
   def main(args: Array[String]) {
-    import FileUtil.contents
+    def contents(path: String): String = {
+      /* much easier than Java :)
+       * see  http://snippets.dzone.com/posts/show/1335 */
+      scala.io.Source.fromPath(path).mkString("")
+    }
 
     if (args.length == 2) {
       makeTestSuite(args(0), contents(args(1)))
@@ -124,15 +127,6 @@ object DocTest {
 }
 
 object FileUtil {
-  def contents(path: String): String = {
-    // based on http://snippets.dzone.com/posts/show/1335
-    
-    val size = (new File(path)).length().asInstanceOf[Int]
-    val buffer = new Array[Byte](size);
-    val f = new BufferedInputStream(new FileInputStream(path));
-    f.read(buffer);
-    return new String(buffer);
-  }
 }
 
 
