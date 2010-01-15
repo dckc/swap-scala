@@ -2,18 +2,12 @@ package org.w3.swap.n3
 
 import java.math.BigDecimal
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
+import scala.collection.immutable.ListSet
 
-import org.w3.swap.rdf.{URI, NotNil}
-import org.w3.swap.uri.Util.combine
-import org.w3.swap.logic.{Term, Apply, Variable}
-
-object AbstractSyntax{
-  def atom(s: Term, p: Term, o: Term) = NotNil(Apply('holds, List(s, p, o)))
-}  
-
-case class EVar(n: Symbol) extends Variable {
-  override def name = n
-}
+import org.w3.swap
+import swap.rdf.{URI, Holds, BlankNode}
+import swap.uri.Util.combine
+import swap.logic.{Term, Apply, Variable}
 
 case class QName(pfx: String, ln: String)
 
@@ -21,7 +15,7 @@ case class QName(pfx: String, ln: String)
  * e.g. "abc"@ en and "10" ^^<data:#int>
  * TODO: oops! ntriples doesn't allow qnames in datatype literals
  * */
-class N3Lex extends org.w3.swap.ntriples.NTriplesStrings {
+class N3Lex extends swap.ntriples.NTriplesStrings {
   // treat comments as whitespace
   override val whiteSpace = "(?:[ \t\n\r]|(?:#.*\n?))*".r
 
@@ -120,14 +114,14 @@ class N3Lex extends org.w3.swap.ntriples.NTriplesStrings {
  * @author <a href="http://www.w3.org/People/Connolly/">Dan Connolly</a>
  */
 class N3Parser(val baseURI: String) extends N3Lex {
-  import org.w3.swap.logic.{Formula, Exists, Forall, And,
-			    Term, Variable, Apply, Literal}
-  import org.w3.swap.rdf.BlankNode
-  import org.w3.swap.rdf.AbstractSyntax.{text, data}
-  import AbstractSyntax.atom
+  import swap.logic.{Formula, Exists, Forall, And,
+		     Term, Variable, Apply, Literal}
+  import swap.rdf.{BlankNode, Holds}
+  import swap.rdf.AbstractSyntax.{text, data}
 
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()
+  val brackets = BlankNode("something", None)
 
   case class Scope(avars: mutable.Stack[Variable],
 		   evars: mutable.Stack[Variable],
@@ -154,11 +148,12 @@ class N3Parser(val baseURI: String) extends N3Lex {
   def mkFormula(statements: List[Formula]): Formula = {
     val f1 = And(statements)
     val s = scopes.top
+    val e = new ListSet[Variable]
     (s.avars.isEmpty, s.evars.isEmpty) match {
       case (true, true) => f1
-      case (true, false) => Exists(s.evars.toList, f1)
-      case (false, true) => Forall(s.avars.toList, f1)
-      case (false, false) => Forall(s.avars.toList, Exists(s.evars.toList, f1))
+      case (true, false) => Exists(e ++ s.evars, f1)
+      case (false, true) => Forall(e ++ s.avars, f1)
+      case (false, false) => Forall(e ++ s.avars, Exists(e ++ s.evars, f1))
     }
   }
 
@@ -197,8 +192,8 @@ class N3Parser(val baseURI: String) extends N3Lex {
     for(prop <- props) {
       val f = prop match {
 	// inverted?
-	case (t2: Term, t3: Term, false) => atom(t1, t2, t3)
-	case (t2: Term, t3: Term, true) => atom(t3, t2, t1)
+	case (t2: Term, t3: Term, false) => Holds(t1, t2, t3)
+	case (t2: Term, t3: Term, true) => Holds(t3, t2, t1)
       }
       scopes.top.statements.push(f)
     }
@@ -231,11 +226,10 @@ class N3Parser(val baseURI: String) extends N3Lex {
     | literal
     | "[" ~> propertylist <~ "]" ^^ {
       case props => {
-	// TODO: prove that evars.size is sufficiently unique
-	val v = BlankNode("e", Some(scopes.top.evars.size))
-	scopes.top.evars.push(v)
-	mkprops(v, props)
-	v
+	val fresh = brackets.fresh()
+	scopes.top.evars.push(fresh)
+	mkprops(fresh, props)
+	fresh
       }
     }
 /* ******

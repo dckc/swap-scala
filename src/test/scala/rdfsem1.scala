@@ -19,7 +19,7 @@ object ent extends Properties("RDF 2004 Entailment") {
   import swap.logic.{Formula, And}
   import swap.rdf.{URI, BlankNode}
   import swap.rdf.AbstractSyntax.{plain, text, data, checkterm, add}
-  import swap.rdf.Semantics.entails
+  import swap.rdf.Semantics.{proofs, entails}
 
   val genVar = for {
     n <- Gen.choose(1, 5)
@@ -87,16 +87,16 @@ object ent extends Properties("RDF 2004 Entailment") {
   property("entailment is transitive") =
     Prop.forAll( (f: Formula, g: Formula, h: Formula) =>
       entails(f, g) ==> {
-	/*
 	println("f |= g")
 	println (f)
 	println (g)
-	*/ 
+	println(proofs(f, g))
 	entails(g, h) ==> {
-	  /*
-	  println("... and g |= h. does f |= h?")
+	  println("... and g |= h.")
+	  println(proofs(g, h))
+	  println("does f |= h?")
 	  println (h)
-	  */
+	  println(proofs(f, h))
 	  entails(f, h)
 	}
       }

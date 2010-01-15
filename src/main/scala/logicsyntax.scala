@@ -2,7 +2,10 @@ package org.w3.swap.logic
 
 import org.w3.swap
 import swap.sexp.{SExp, Atom, Cons}
-import swap.sexp.SExp.fromList
+import swap.sexp.SExp.fromSeq
+
+// try to preserve order for testing
+import scala.collection.immutable.ListSet
 
 /**
  * Formula of an arbitrary first order logic.
@@ -18,9 +21,9 @@ import swap.sexp.SExp.fromList
 sealed abstract class Formula() {
   import AbstractSyntax.Subst
 
-  def variables(): Iterable[Variable]
-
-  def freevars(): Iterable[Variable]
+  def terms(): Seq[Term]
+  def variables(): Set[Variable]
+  def freevars(): Set[Variable]
 
   /* TODO: don't make a new formula unless we have to. */
   def subst(s: Subst): Formula
@@ -30,59 +33,68 @@ sealed abstract class Formula() {
   override def toString() = quote().print()
 }
 
-abstract class Atomic extends Formula
+abstract class Atomic extends Formula {
+  override def variables(): Set[Variable] = {
+    terms().foldLeft(ListSet.empty[Variable]) {
+      (done, next) => done ++ next.variables()}
+  }
+  override def freevars() = variables()
+}
+
 abstract class Unary(f: Formula) extends Formula
 abstract class Binary(f: Formula, g: Formula) extends Formula
 abstract class Nary(val connective: Symbol,
-		    val fl: Iterable[Formula]) extends Formula {
+		    val fl: Seq[Formula]) extends Formula {
   override def quote() = Cons(connective,
-			      fromList(fl.toList.map(f => f.quote())) )
+			      fromSeq(fl.toList.map(f => f.quote())) )
 
-  override def variables() = fl.flatMap(fmla => fmla.variables())
-  override def freevars() = fl.flatMap(fmla => fmla.freevars())
+  override def terms() = fl.flatMap(fmla => fmla.terms())
+  override def variables() = (ListSet.empty[Variable] ++
+			      fl.flatMap(fmla => fmla.variables()) )
+  override def freevars() = variables()
 }
 
-case class And(val fmlas: Iterable[Formula]) extends Nary('and, fmlas){
+case class And(val fmlas: Seq[Formula]) extends Nary('and, fmlas){
   override def subst(s: AbstractSyntax.Subst) = {
     And(fmlas.map(fmla => fmla.subst(s)))
   }
 }
 
 sealed abstract class Quantified extends Formula {
-  val vars: List[Variable]
+  val vars: Set[Variable]
   val f: Formula
 
   protected val head: Symbol
 
+  def terms() = List() ++ vars ++ f.terms() // scalaQ: why doesn't toSeq work?
   def variables() = vars ++ f.variables()
-  def freevars() = f.freevars().filter(v => vars.contains(v))
+  def freevars() = f.freevars().filter(fv => !vars.contains(fv))
 
-  def quote() = fromList(List(head,
-			      vars.removeDuplicates.map(v => v.quote()),
-			      f.quote()))
+  def quote() = fromSeq(List(head,
+			     fromSeq(vars.toSeq.map(v => v.quote())),
+			     f.quote() ))
 }
 
-case class Exists(override val vars: List[Variable],
+case class Exists(override val vars: Set[Variable],
 		  override val f: Formula) extends Quantified {
+  override val head = 'exists
+
   /**
    * assume the vars in s don't occur in vars.
    * i.e. you can only substitute for free variables.
    * TODO: assert this. */
   def subst(s: AbstractSyntax.Subst) = Exists(vars, f.subst(s))
-
-  override val head = 'exists
 }
 
-case class Forall(override val vars: List[Variable],
+case class Forall(override val vars: Set[Variable],
 		  override val f: Formula) extends Quantified {
+  override val head = 'forall
+
   /**
    * assume the vars in s don't occur in vars.
    * i.e. you can only substitute for free variables.
    * TODO: assert this. */
-  import AbstractSyntax.Subst
-  def subst(s: Subst) = Forall(vars, f.subst(s))
-
-  override val head = 'forall
+  def subst(s: AbstractSyntax.Subst) = Forall(vars, f.subst(s))
 }
 
 
@@ -100,7 +112,7 @@ sealed abstract class Term() {
   /**
    * All variables occurring in this term.
    */
-  def variables(): Iterable[Variable]
+  def variables(): Set[Variable]
 
   /**
    * This term with the variables in s replaced by their values.
@@ -119,19 +131,25 @@ abstract class Variable() extends Term {
   import AbstractSyntax.{Subst, lookup}
   override def subst(s: Subst) = lookup(this, s)
 
-  override def variables() = List(this)
+  override def variables() = ListSet(this)
 
-  def name: Symbol
-  override def quote() = name
+  /**
+   * Produce a fresh variable.
+   * We guarantee that fresh(fresh(x)) != fresh(x)
+   * but not necessarily fresh(x) != fresh(y)
+   */
+  def fresh(): Variable
 }
 
 abstract class Application() extends Term {
   def fun: Any
   def args: List[Term]
 
-  override def variables() = args.flatMap(term => term.variables())
+  override def variables() = {
+    ListSet.empty ++ args.flatMap(term => term.variables())
+  }
   override def quote(): SExp = {
-    Cons(Atom(fun), fromList(args.map(t => t.quote())))
+    Cons(Atom(fun), fromSeq(args.map(t => t.quote())))
   }
 }
 
@@ -153,25 +171,7 @@ case class Apply(sym: Symbol, terms: List[Term]) extends Application {
   override def args = terms
 
   import AbstractSyntax.Subst
-  override def subst(s: Subst): Term = {
-    /* don't make a new term unless we have to */
-    /* oops; premature optimization. */
-    def each(tl: List[Term]): (Boolean, List[Term]) = {
-      tl match {
-	case Nil => (false, Nil)
-	case t1 :: rest => {
-	  val x = t1.subst(s)
-	  val (hit, rest2) = each(rest)
-
-	  if (t1.eq(x)) (hit, t1 :: rest2)
-	  else (true, x :: rest2)
-	}
-      }
-    }
-    val (hit, terms2) = each(terms)
-    if (hit) Apply(sym, terms2)
-    else this
-  }
+  override def subst(s: Subst): Term = Apply(sym, terms.map(t => t.subst(s)))
 }
 
 
@@ -227,47 +227,31 @@ object AbstractSyntax {
     }
   }
 
-  def unifyall(tl1: List[Term], tl2: List[Term], s: Subst): Option[Subst] = {
-    (tl1, tl2) match {
-      case (Nil, Nil) => Some(s)
-      case (Nil, _) => None
-      case (_, Nil) => None
-      case (head1 :: tail1, head2 :: tail2) => {
-	unify(head1, head2, s) match {
+  def unifyall(ts1: Seq[Term], ts2: Seq[Term], s: Subst): Option[Subst] = {
+    (ts1.isEmpty, ts2.isEmpty) match {
+      case (true, true) => Some(s)
+      case (true, false) => None
+      case (false, true) => None
+      case _ => {
+	unify(ts1.head, ts2.head, s) match {
 	  case None => None
-	  case Some(ss) => unifyall(tail1, tail2, ss)
+	  case Some(ss) => unifyall(ts1.tail, ts2.tail, ss)
 	}
       }
     }
   }
 
-  def renamevars(f: Formula, vl: List[Variable]): Formula = {
-    f.subst(mksubst(vl, Nil, Map()))
+  def renamevars(f: Formula, todo: Set[Variable], root: Variable): Formula = {
+    val (sub, _) = mksubst(todo, Nil, root, Map())
+    f.subst(sub)
   }
 
-  def mksubst(todo: List[Variable], taken: List[Variable], s: Subst): Subst = {
-    todo match {
-      case Nil => s
-      case v :: vrest => {
-	val vr = rename(v, taken)
-	mksubst(vrest, vr :: taken, s + (v -> vr))
-      }
+  def mksubst(todo: Iterable[Variable], done: List[Variable],
+	      root: Variable, s: Subst): (Subst, List[Variable]) = {
+    if (todo.isEmpty) (s, done) else {
+      val vr = root.fresh()
+      mksubst(todo.tail, vr :: done, root, s + (todo.head -> vr))
     }
-  }
-
-  case class Var(n: Symbol) extends Variable {
-    override def name = n
-  }
-
-  def rename(v: Variable, taken: List[Variable]): Variable = {
-    val names = taken.map(v => v.name)
-    val pfx = v.name
-    def trynext(n: Int): Variable = {
-      val name = Symbol(pfx.name + "." + n.toString())
-      if (names.indexOf(name) < 0) Var(name)
-      else trynext(n+1)
-    }
-    trynext(2)
   }
 }
 

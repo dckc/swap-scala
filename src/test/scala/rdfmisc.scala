@@ -6,19 +6,27 @@ import org.scalatest.matchers.ShouldMatchers
 import org.w3.swap
 
 class LogicSyntax extends Spec with ShouldMatchers {
-  import swap.logic.{Formula, And, Exists,
+  import swap.logic.{Formula, And, Exists, Atomic,
 		     Term, Variable, Literal, Apply }
-  import swap.rdf.NotNil  // TODO: make our own Atomic class
+  case class NotNil(x: Term) extends Atomic {
+    override def terms = List(x)
+    override def variables = x.variables()
+    override def freevars = variables()
+    override def quote() = x.quote()
+    override def subst(sub: swap.logic.AbstractSyntax.Subst) = (
+      NotNil(x.subst(sub)) )
+  }
 
   case class V(n: Symbol) extends Variable {
-    override def name = n
+    override def fresh() = V(Symbol(n.name + this.hashCode()))
+    override def quote() = n
   }
 
   implicit def mkv(n: Symbol): Variable = V(n)
   implicit def mkn(n: Int): Term = Literal(n)
 
   describe("logical formulas") {
-    val f = Exists(List('x, 'y),
+    val f = Exists(Set() ++ List[Variable]('x, 'y),
 		   And(List(NotNil('x),
 			    NotNil('y),
 			    NotNil(Apply('nil, Nil)),
@@ -39,11 +47,11 @@ class LogicSyntax extends Spec with ShouldMatchers {
 
 class RDFSyntax extends Spec with ShouldMatchers {
   import swap.logic.Term
-  import swap.rdf.{BlankNode, URI}
-  import swap.rdf.AbstractSyntax.{atom, add, plain}
+  import swap.rdf.{BlankNode, URI, Holds}
+  import swap.rdf.AbstractSyntax.{add, plain}
 
   describe("triples as atomic formulas") {
-    val t1 = atom(URI("data:bob"), URI("data:name"), plain("Bob"))
+    val t1 = Holds(URI("data:bob"), URI("data:name"), plain("Bob"))
 
     it ("should convert RDF triple Atoms to strings reasonably") {
       (t1.toString()) should equal (
@@ -66,7 +74,7 @@ class RDFSyntax extends Spec with ShouldMatchers {
 
   describe("graph building") {
 
-    val graph = add(atom(tbob, phome, vhome),
+    val graph = add(Holds(tbob, phome, vhome),
 		    vhome, pin, ttexas)
 
     it ("should make a graph of 2 triples") {
@@ -97,9 +105,9 @@ class RDFSyntax extends Spec with ShouldMatchers {
 
 class RDFSemantics extends Spec with ShouldMatchers {
   import swap.rdf.{BlankNode, URI}
-  import swap.rdf.AbstractSyntax.{plain}
+  import swap.rdf.AbstractSyntax.{plain, conjunction}
   import swap.ntriples.NTriplesParser
-  import swap.rdf.Semantics.{entails, conjoin}
+  import swap.rdf.Semantics.{entails}
   import swap.logic.{Term, Apply, And}
   import swap.logic.AbstractSyntax.unify
 
@@ -120,7 +128,7 @@ class RDFSemantics extends Spec with ShouldMatchers {
   def mkf(s: String) = new NTriplesParser().toFormula(s)
 
   describe ("Semantics: Conjunction (aka merge)") {
-    val and2 = conjoin(mkf("""#
+    val and2 = conjunction(mkf("""#
 <data:bob> <data:home> <data:x> .
 <data:dan> <data:home> <data:Austin>.
 """),
@@ -139,8 +147,10 @@ class RDFSemantics extends Spec with ShouldMatchers {
 
     it("should do renaming when necessary"){
       val f = mkf("<data:bob> <data:home> _:somewhere .\n")
-      ( conjoin(f, f).quote.print()
-     ) should equal("(exists (_:somewhere _:somewhere.2) (and (holds (data:bob) (data:home) _:somewhere) (holds (data:bob) (data:home) _:somewhere.2)))")
+      ( conjunction(f, f).quote.print()
+     ) should equal(
+	"(exists (_:somewhere.1 _:somewhere) (and (holds (data:bob) (data:home) _:somewhere) (holds (data:bob) (data:home) _:somewhere.1)))"
+      )
     }
   }
 

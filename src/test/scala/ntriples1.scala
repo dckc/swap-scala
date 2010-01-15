@@ -5,8 +5,7 @@ import org.scalatest.matchers.ShouldMatchers
 
 class NTriplesMisc extends Spec with ShouldMatchers {
   import org.w3.swap
-  import swap.rdf.{BlankNode, URI}
-  import swap.rdf.AbstractSyntax.atom
+  import swap.rdf.{BlankNode, URI, Holds}
   import swap.logic.{And, Exists}
   import swap.ntriples.NTriplesParser
 
@@ -24,8 +23,8 @@ class NTriplesMisc extends Spec with ShouldMatchers {
     it("should expect caller to remove dups"){
       val v1 = BlankNode("", Some("abc".intern()))
       val v2 = BlankNode("", Some("<abc>".substring(1,4).intern()))
-      val f = And(List(atom(URI("data:s1"), URI("data:p"), v1),
-		       atom(URI("data:s2"), URI("data:p"), v2) ))
+      val f = And(List(Holds(URI("data:s1"), URI("data:p"), v1),
+		       Holds(URI("data:s2"), URI("data:p"), v2) ))
       (f.variables().toList.removeDuplicates) should equal (List(v1))
       (f.variables().toList.removeDuplicates) should equal (
 	List(v1, v2).removeDuplicates)
@@ -52,7 +51,7 @@ _:somewhere <data:in> <data:Texas> .
       (fr match {
 	case p.Success(Exists(vl, _), _) => vl.toString()
 	case _ => "FAIL"
-      }) should equal ( "List(BlankNode(_:somewhere,None))" )
+      }) should equal ( "Set(BlankNode(_:somewhere,None))" )
 
     }
 

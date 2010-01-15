@@ -1,31 +1,41 @@
-/*
- * RDF Abstract syntax as per 2004 Recommendation
- * http://www.w3.org/TR/2004/REC-rdf-concepts-20040210/
- */
-
 package org.w3.swap.rdf
+
+import scala.collection.immutable.ListSet
 
 import org.w3.swap
 import swap.logic.{Formula, Atomic, And, Exists,
 		   Term, Variable,
 		   Application, Apply, Literal,
-		   AbstractSyntax => Logic
-		 }
+		   AbstractSyntax => Logic, ConjunctiveKB }
+import swap.sexp.Cons
+import swap.sexp.SExp.fromSeq
 
-case class NotNil(x: Term) extends Atomic {
-  import Logic.Subst
+/**
+ * The atomic formulas of RDF.
+ * @param s a BlankNode or URI
+ * @param p a URI
+ * @param o a URI, BlankNode, or Literal from plain(), text(), data(), or xml()
+ * 
+ * TODO: move much of its structure up to Atomic a la Application
+ */
+case class Holds(s: Term, p: Term, o: Term) extends Atomic {
+  require(p match {
+    case URI(_) => s match {
+      case BlankNode(_, _) | URI(_) => AbstractSyntax.checkterm(o)
+      case _ => false
+    }
+    case _ => false
+  })
+  
+  override def terms() = List(s, p, o)
+  def subst(sub: Logic.Subst) = Holds(s.subst(sub), p.subst(sub), o.subst(sub))
 
-  def variables() = x.variables()
-  def freevars() = x.variables()
-  def subst(s: Subst) = NotNil(x.subst(s))
-
-  /* This sorta promotes terms to formulas, which is like ACL2.
-   * But *unlike* ACL2, (and ...) is a formula, not a term,
-   * and the formulas below it may be quantified. Hmm.*/
-  def quote() = x.quote()
+  override def quote() = Cons('holds, fromSeq(terms.map(t => t.quote())))
 }
 
-/* Terms */
+/**
+ * Logical constants (i.e. 0-ary function terms) of RDF.
+ */
 case class URI(val i: String) extends Application {
   /* ISSUE: not every string makes a URI */
   /* ISSUE: actually closer to IRI; called RDFuri or something
@@ -33,63 +43,48 @@ case class URI(val i: String) extends Application {
   override def fun = Symbol(i)
   override def args = Nil
 
-  import Logic.Subst
-  override def subst(s: Subst) = this
+  override def subst(s: Logic.Subst) = this
 }
 
+/**
+ * Logical variables of RDF.
+ */
 case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
-  override def name: Symbol = {
-    qual match {
-      case None => Symbol(n)
-      case Some(x) => Symbol(n + "." + x.toString())
-    }
+  override def quote() = name
+
+  lazy val name = qual match {
+    case None => Symbol(n)
+    case Some(x) => Symbol(n + "." + x.toString())
   }
 
-  /* For debuggin sanity etc., let's be sure that variables that
-   * look the same compare equal.
-   * TODO: consider moving this constraint up to Variable. */
-  override def equals(that: Any): Boolean = {
-    that match {
-      case b: BlankNode => name == b.name
-      case _ => false
-    }
+  override def fresh() = BlankNode(n, Some(new Thing()))
+}
+class Thing {
+  object Counter {
+    protected var cur = 0
+    def next(): Int = { cur += 1; cur }
   }
-  override def hashCode(): Int = name.hashCode()
+  
+  private val id = Counter.next()
+  override def toString = id.toString()
 }
 
-class SyntaxError(msg: String) extends Exception
 
+/**
+ * RDF Abstract syntax as per 2004 Recommendation
+ * http://www.w3.org/TR/2004/REC-rdf-concepts-20040210/
+ */
 object AbstractSyntax {
+  import scala.xml.NodeSeq
+
   final val rdf_type = URI(Vocabulary.`type`)
 
-  def wellformed(f: Formula): Boolean = {
-    f match {
-      case Exists(vs, g) => {
-	wfconj(g, vs)
-      }
-      case And(_) => wfconj(f, Nil)
-      case NotNil(_) => wfatom(f, Nil)
-      case _ => false
-    }
-  }
-
-  def wfconj(f: Formula, bound: List[Variable]): Boolean = {
-    f match {
-      case And(fmlas) => fmlas.forall(g => wfatom(g, bound))
-      case NotNil(_) => wfatom(f, bound)
-      case _ => false
-    }
-  }
-
-  def wfatom(f: Formula, bound: List[Variable]): Boolean = {
-    f match {
-      case NotNil(Apply('holds, List(s, p, o))) => {
-	((f.variables() filterNot (bound contains)).isEmpty
-	 && checkterm(s) && checkterm(p) && checkterm(o))
-      }
-      case _ => false
-    }
-  }
+  def plain(s: String): Term = Literal(s)
+  def text(s: String, code: String): Term = Apply('text,
+						  List(Literal(code),
+						       Literal(s)))
+  def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
+  def xml(x: NodeSeq): Term = Apply('xml, List(Literal(x)))
 
   def checkterm(t: Term): Boolean = {
     t match {
@@ -99,69 +94,132 @@ object AbstractSyntax {
       case Literal(s: String) => true
 
       /* TODO detail: lang code syntax */
+      /* TODO: canonical case of lang code */
       case Apply('text, List(Literal(s: String),
 			     Literal(code: String) )) => true
       case Apply('data, List(URI(_),
 			     Literal(s: String) )) => true
-      case Apply('xml, List(Literal(s: String))) => true
+      case Apply('xml, List(Literal(e: NodeSeq))) => true
 
       case _ => false
     }
   }
 
-  def plain(s: String): Term = Literal(s)
-  def text(s: String, code: String): Term = Apply('text,
-						  List(Literal(code),
-						       Literal(s)))
-  def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
-  def xml(lex: String): Term = Apply('xml, List(Literal(lex)))
-
   /**
-   * holds(s, p, o) is a term that is not nil iff s is related to o by p.
-   *
-   * TODO: consider using a distinct type for Holds.
-   * TODO: consider using an Either type to constrain s to URI, BlankNode
-   * TODO: consider constraining p to URI. (but keep in mind generalized
-   *       graphs in the RDFS sense.)
+   * TODO: normalize() that can do e.g. And(And(f, g), h) => And(f, g, h)
+   * then wellformed is just (a) no free vars, and (b) all terms check.
    */
-  def holds(s: Term, p: Term, o: Term) = Apply('holds, List(s, p, o))
+  def wellformed(f: Formula): Boolean = {
 
-  /* TODO: test that this produces only wffs or exceptions */
-  def atom(s: Term, p: Term, o: Term) = {
-    /* scalaQ: use lazy value instead of def? */
-    def atom() = NotNil(holds(s, p, o))
-
-    p match {
-      case URI(_) =>
-	s match {
-	  case BlankNode(_, _) | URI(_) => atom()
-	  case _ => throw new SyntaxError("subject must be URI or Blank Node")
-	}
-      case _ => throw new SyntaxError("predicate must be URI")
+    def wfatom(f: Formula): Boolean = {
+      f match {
+	case Holds(s, p, o) => checkterm(s) && checkterm(p) && checkterm(o)
+	case _ => false
+      }
     }
+
+    def wfconj(fmlas: Iterable[Formula]): Boolean = {
+      fmlas.forall(f => wfatom(f))
+    }
+    
+    if (f.freevars().isEmpty) {
+      f match {
+	case Exists(vs, And(fmlas)) => {
+	  if (vs.isEmpty) false else wfconj(fmlas)
+	}
+	case And(fmlas) => {
+	  wfconj(fmlas)
+	}
+	case _ => wfatom(f)
+      }
+    } else false
   }
 
-  /* preserves wff-ness
-   * preserves order of Atoms in And()
+
+  /**
    * assumes all variables are in the same scope
+   * preserves wff-ness
+   * preserves order of Atoms in And()
    * */
   def add (f: Formula, s: Term, p: Term, o: Term): Formula = {
-    val g = atom(s, p, o)
+    assert(wellformed(f))
+
+    val g = Holds(s, p, o)
     val vg = g.variables
 
     f match {
-      case NotNil(_) => {
+      case x: Atomic => {
 	if (vg.isEmpty) { And(List(f, g)) }
-	else { Exists(vg.toList, And(List(f, g))) }
+	else { Exists(vg, And(List(f, g))) }
       }
       case And(fl) => {
 	if (vg.isEmpty) { And(fl ++ List(g)) }
-	else { Exists(vg.toList, And(fl ++ List(g))) }
+	else { Exists(vg, And(fl ++ List(g))) }
       }
       case Exists(vl, And(fl)) => {
 	Exists(vl ++ g.variables, And(fl ++ List(g)))
       }
-      case _ => throw new SyntaxError("f must be an RDF 2004 formula")
+      case _ => throw new Exception("wellformed() is broken")
+    }
+  }
+
+  def fresh(): Application = {
+    Apply(Symbol("skolem" + new Thing()), Nil)
+  }
+
+
+  def skolemize(f: Formula, fresh: () => Application): Formula = {
+    f match {
+      case Exists(vars, g) => {
+	// make a substitution that maps each variable to a fresh ground term
+	val pairs = vars.toList.map(v => (v, fresh()))
+	val sub = Map(pairs: _*) 
+
+	f.subst(sub)
+      }
+      case _ => {
+	assert(f.variables().isEmpty) // just EC logic for now
+	f
+      }
+    }
+  }
+
+  /**
+   * preserved well-formedness
+   * renames variables when necessary
+   * TODO: split rdf well-formedness into term checking and EC formula checking.
+   */
+  def conjunction(f: Formula, g: Formula): Formula = {
+    import Logic.mksubst
+
+    assert(wellformed(f))
+    assert(wellformed(g))
+
+    def mkand(f: Formula, g: Formula): Formula = {
+      (f, g) match {
+	case (And(fl), And(gl)) => And(fl ++ gl)
+	case (x: Atomic, And(gl)) => And(List(f) ++ gl)
+	case (And(fl), x: Atomic) => And(fl ++ List(g))
+	case (_, _) => And(List(f, g))
+      }
+    }
+
+    (f, g) match {
+      case (Exists(vf, ff), Exists(vg, gg)) => {
+	val shared = vf filter (vg contains)
+	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
+	  val (sub, freshvars) = mksubst(shared, Nil, 
+					 shared.iterator.next, Map())
+	  val g3 = gg.subst(sub)
+	  (Set() ++ freshvars, g3)
+	}
+
+	Exists(vf ++ vg2, mkand(ff, g2))
+      }
+      case (Exists(vf, ff), _) => {
+	Exists(vf, mkand(ff, g))
+      }
+      case (_, _) => mkand(f, g)
     }
   }
 }
@@ -178,118 +236,101 @@ object AbstractSyntax {
    * didn't end up using it much.
    */
 
-/* TODO: move this to swap.logic.ExistentialConjuctiveFragment
- * cf. http://en.wikipedia.org/wiki/Conjunctive_query
- * */
-object Semantics {
-  import Logic.{renamevars, mksubst}
+class Graph(val arcs: Iterable[Holds]) extends ConjunctiveKB {
   import AbstractSyntax.wellformed
 
-  def entails(f: Formula, g: Formula): Boolean = {
-    /* assumes formulas are in RDF normal form:
-     * And()
-     * or NotNil(term)
-     * or And(f1 :: f2 :: tail)
-     * or Exists(v1 :: vrest, And(fmlas))
-     * */
+  override def getData(tokens: Seq[Any]) = arcs.toStream
 
-    val data = f match {
-      case NotNil(_) => List(f)
-      case And(fmlas) => fmlas
-      case Exists(vars, ff) => {
-	/* skolemize the variables in the antecedent */
-	/* should use functions rather than variables,
-	 * but as long as they're fresh, it doesn't matter.
-	 * */
-	List(renamevars(ff, vars.toList))
+  /**
+   * Make a graph out of the atoms of a formula.
+   */
+  def this(f: Formula) = {
+    this(
+      (f match {
+	case x: Atomic => List(f)
+	case And(fmlas) => fmlas
+	case Exists(vars, And(fmlas)) => fmlas
+	case _ => throw new Exception("@@! wellformed")
+      }).flatMap { // map Formula to Holds
+	case h: Holds => Some(h);
+	case _ => throw new Exception("require(wellformed(f))@@")
+      })
+  }
+
+
+  /**
+   * @param s: a Term. exactly 1 of s, p, o is a Variable
+   * @param p: a Term. exactly 1 of s, p, o is a Variable
+   * @param o: a Term. exactly 1 of s, p, o is a Variable
+   *
+   * @return a Stream of matching terms.
+   */
+  def each(s: Term, p: Term, o: Term): Stream[Term] = {
+    val goal = Holds(s, p, o)
+    assert(goal.variables.size == 1)
+
+    for(subst <- solve(goal)) yield {
+      // value of 1st/only binding
+      subst.valuesIterator.next
+    }
+  }
+
+  /**
+   * @throws Predef.NoSuchElementException if there's no such arc.
+   */
+  def any(s: Term, p: Term, o: Term) = each(s, p, o).head
+
+  def contains(s: Term, p: Term, o: Term): Boolean = {
+    val goal = Holds(s, p, o)
+    assert(goal.variables.size == 1)
+
+    !solve(goal).isEmpty
+  }
+
+  /**
+   * Handy variable specific to this graph for use in queries.
+   */
+  val qvar = BlankNode("Q", None).fresh()
+}
+
+object Semantics {
+  import AbstractSyntax.{wellformed, skolemize, fresh}
+
+  def entails(f: Formula, g: Formula): Boolean = {
+    ! proofs(f, g).isEmpty
+  }
+
+  def proofs(f: Formula, g: Formula): Stream[Logic.Subst] = {
+    assert(wellformed(f))
+    assert(wellformed(g))
+
+    val fmlas = f match {
+      case atom: Holds => List(atom)
+      case And(atoms) => atoms
+      case Exists(_, _) => {
+	val fskol = skolemize(f, fresh _ )
+	fskol match {
+	  case Exists(vars, And(atoms)) => atoms
+	  case _ => throw new Exception("skolemize() is broken")
+	}
       }
       case _ => {
-	/* TODO: check well-formedness in general. */
-	throw new SyntaxError("no Forall in RDF 2004")
+	throw new Exception("wellformed() is broken")
       }
     }
 
-    val kb = new KnowledgeBase(data.toStream)
+    val arcs = fmlas.flatMap {
+      case atom: Holds => Some(atom)
+      case _ => throw new Exception("wellformed() is broken")
+    }
+    val kb = new Graph(arcs)
 
     val answers = g match {
       case Exists(vars, gg) => kb.solve(gg)
       case _ => kb.solve(g)
     }
 
-    ! answers.isEmpty
-  }
-
-
-  /* TODO: probably better named conjunction */
-  def conjoin(f: Formula, g: Formula): Formula = {
-    assert(wellformed(f))
-    assert(wellformed(g))
-
-    (f, g) match {
-      case (Exists(vf, ff), Exists(vg, gg)) => {
-	val shared = vf.toList intersect vg.toList
-	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
-	  val sub = mksubst(shared, Nil, Map())
-	  val g3 = gg.subst(sub)
-	  val vg3: List[Variable] = for {
-	    t <- sub.valuesIterator.toList
-	    if t.isInstanceOf[Variable]
-	  } yield t.asInstanceOf[Variable]
-
-	  (vg3, g3)
-	}
-
-	Exists(vf ++ vg2, conjoin2(ff, g2))
-      }
-      case (Exists(vf, ff), _) => {
-	Exists(vf, conjoin2(ff, g))
-      }
-      case (_, _) => conjoin2(f, g)
-    }
-  }
-
-  protected def conjoin2(f: Formula, g: Formula): Formula = {
-    (f, g) match {
-      case (And(fl), And(gl)) => And(fl ++ gl)
-      case (x: Atomic, And(gl)) => And(List(f) ++ gl)
-      case (And(fl), x: Atomic) => And(fl ++ List(g))
-      case (_, _) => And(List(f, g))
-    }
+    answers
   }
 }
 
-class GoalRestriction(msg: String) extends Exception
-
-class KnowledgeBase(facts: Stream[Formula]) {
-  import Logic.{Subst, unify}
-
-  /* TODO: index kb by FunctionSymbol
-   * a la:
-   * type KB = Function[Set[FunctionSymbol], Stream[Formula]]
-   * */
-  def solve(goal: Formula): Stream[Subst] = solve(goal, Map())
-
-  def solve(goal: Formula, s: Subst): Stream[Subst] = {
-    goal match {
-      case NotNil(term) => {
-	facts.flatMap(f => f match {
-	  case NotNil(t2) => unify(term, t2, s).toStream
-	  case _ => Stream.empty
-	})
-      }
-      case And(fmlas) => solveall(fmlas, s)
-      case _ => { throw new GoalRestriction("huh? " + goal.toString()) }
-    }
-  }
-
-  def solveall(goals: Iterable[Formula], s: Subst): Stream[Subst] = {
-    goals match {
-      case Nil => Stream.cons(s, Stream.empty)
-      case List(g) => solve(g, s)
-      case g :: tail =>
-	solve(g, s).flatMap(si => solveall(tail, si))
-    }
-  }
-
-}
-    

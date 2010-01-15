@@ -1,16 +1,20 @@
 package org.w3.swap.rdf
+
 import Vocabulary.nsuri
 import AbstractSyntax.rdf_type
+import org.w3.swap
+import swap.uri.Util.combine
 
 import scala.xml.{Elem, NodeSeq, Node}
 
 class RDFXMLParser(base: String) {
   import Vocabulary.nsuri
   import org.w3.swap.logic.{Formula, Exists, And, Term}
-  import AbstractSyntax.{atom, plain, data, text}
+  import AbstractSyntax.{plain, data, text}
 
   import scala.collection.mutable
   val statements = new mutable.Stack[Formula]()
+  val blank = BlankNode("node", None) // source of fresh variables
 
   def parse(e: Elem): Formula = {
     e match {
@@ -23,10 +27,10 @@ class RDFXMLParser(base: String) {
       case _ => parseNodeElement(e)
     }
 
-    val f1 = And(statements.toList)
+    val f1 = And(statements.toList.reverse)
     val vars = f1.variables() // or keep a list/stack as we go?
     if (vars.isEmpty) f1
-    else Exists(vars.toList, f1)
+    else Exists(vars, f1)
   }
 
   private def euri(e: Elem) = URI(e.namespace + e.label)
@@ -43,17 +47,17 @@ class RDFXMLParser(base: String) {
     val id = ne \ attr_ID
     val nodeID = ne \ attr_nodeID
     val subject = {
-      if (about.length > 0) URI(about.text) // @@TODO: relative URI refs
-      else if (id.length > 0) URI(base + "#" + id.text)
+      if (about.length > 0) URI(combine(base, about.text))
+      else if (id.length > 0) URI(combine(base, "#" + id.text))
       else if (nodeID.length > 0) BlankNode(nodeID.text, None)
-      else BlankNode("e", Some(ne.hashCode))
+      else blank.fresh()
     }
     
     ne match {
       case <Description>{children @_*}</Description> if (ne.namespace == nsuri)
 	=> parseProperties(subject, children)
       case _ => {
-	statements.push(atom(subject, rdf_type, euri(ne)))
+	statements.push(Holds(subject, rdf_type, euri(ne)))
 	parseProperties(subject, ne.child)
       }
     }
@@ -71,9 +75,9 @@ class RDFXMLParser(base: String) {
 	val elems = e.child.filter(c => c.isInstanceOf[Elem])
 
 	val obj = (!res.isEmpty, pt.text, elems.length) match {
-	  case (true, _, _) => URI(base + res.text) // @@TODO: URI.combine
+	  case (true, _, _) => URI(combine(base, res.text))
 	  case (false, "Resource", _) => {
-	    val r = BlankNode("e", Some(e.hashCode()))
+	    val r = blank.fresh()
 	    parseProperties(r, e.child)
 	    r
 	  }
@@ -81,13 +85,14 @@ class RDFXMLParser(base: String) {
 	  case (false, "Collection", _) =>
 	    throw new Exception("@@TODO: Collection")
 	  case (false, "", 1) => parseNodeElement(elems(0).asInstanceOf[Elem])
-	  case (false, "", 0) if !dt.isEmpty => data(e.text, URI(dt.text))
+	  case (false, "", 0) if !dt.isEmpty =>
+	    data(e.text, URI(combine(base, dt.text)))
 	  case (false, "", 0) if !lang.isEmpty => text(e.text, lang.text)
 	  case (false, "", 0) => plain(e.text)
 	  case _ => 
 	    throw new Exception("@@bad object syntax")
 	}
-	statements.push(atom(subject, euri(e), obj))
+	statements.push(Holds(subject, euri(e), obj))
       }
       case _ => // TODO: check that only whitespace goes here.
     }

@@ -1,39 +1,55 @@
 package org.w3.swap.sexp
 
 sealed abstract class SExp {
-  def print(): String
+  def print(): String = {
+    val b = new StringBuilder()
+    printTo(b)
+    b.toString()
+  }
+
+  def printTo(builder: StringBuilder)
 }
 
-
 case class Cons(head: SExp, tail: SExp) extends SExp {
-  import SExp.tailString
+  import SExp.printTail
 
-  // TODO: optimize with StringBuilder or something.
-  override def print() = {
+  override def printTo(builder: StringBuilder) {
+
     head match {
       case Atom('quote) => {
 	tail match {
-	  case Cons(v, _) => "'" + v.print()
-	  case _ => throw new Exception("bad 'quote tail:" + tail.toString())
+	  case Cons(v, _) => {
+	    builder.append("'")
+	    v.printTo(builder)
+	  }
+	  case _ => throw new Exception("bad 'quote tail:" + this.toString())
 	}
       }
-      case _ => "(" + head.print() + tailString(tail)
+
+      case _ => {
+	builder.append("(")
+	head.printTo(builder)
+	printTail(tail, builder)
+      }
     }
   }
 
-  /* TODO: streaming ... e.g. lazy Stream[String] */
   /* TODO: pretty-printing */
 }
 
-case class Atom(x: Any) extends SExp {
-  override def print() = {
+case class Atom(val x: Any) extends SExp {
+  override def printTo(builder: StringBuilder) {
     x match {
       /* lisp syntax, not scala syntax.
        * Well... close, anyway... lowercase symbols
        * and such should print as |foo|. */
-      case s: Symbol => s.name
-      case str: String => "\"" + str + "\"" /* TODO: escaping */
-      case i: Int => i.toString()
+      case s: Symbol => builder.append(s.name)
+      case str: String => {
+	builder.append("\"")
+	builder.append(str) /* @@TODO: escaping */
+	builder.append("\"")
+      }
+      case i: Int => builder.append(i.toString())
       /* TODO: print decimals as (/ num denom) */
 
       case _ => throw new Exception("huh? what's that?" + x.toString())
@@ -44,29 +60,33 @@ case class Atom(x: Any) extends SExp {
 object SExp {
   val NIL = Atom('NIL)
 
-  def fromList(items: List[Any]): SExp = {
-    items match {
-      case Nil => NIL
-      case hd :: tl => {
-	val hexp = hd match {
-	  case l: List[_] => fromList(l)
-	  case e: SExp => e
-	  case _ => Atom(hd)
-	}
-	Cons(hexp, fromList(tl))
+  def fromSeq(items: Seq[Any]): SExp = {
+    if (items.isEmpty) NIL
+    else {
+      val hexp: SExp = items.head match {
+	case e: SExp => e
+	case s: Seq[_] => fromSeq(s)
+	case _ => Atom(items.head)
       }
+      Cons(hexp, fromSeq(items.tail))
     }
   }
 
   implicit def fromSymbol(s: Symbol): SExp = Atom(s)
 
   /* scalaQ: private? */
-  def tailString(e: SExp): String = {
+  def printTail(e: SExp, builder: StringBuilder) {
     e match {
-      case Cons(h, t) => " " + h.print() + tailString(t)
-      case NIL => ")" // TODO: linebreaks in sexp printing
-      case _ => ". " + e.print()
+      case Cons(h, t) => {
+	builder.append(" ")
+	h.printTo(builder)
+	printTail(t, builder)
+      }
+      case NIL => builder.append(")") // TODO: linebreaks in sexp printing
+      case _ => {
+	builder.append(". ")
+	e.printTo(builder)
+      }
     }
   }
-
 }

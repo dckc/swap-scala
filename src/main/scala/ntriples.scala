@@ -2,11 +2,12 @@ package org.w3.swap.ntriples
 
 /* Parsers brings magic such as ~ and ^^ */
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
+import scala.collection.immutable.ListSet
 
 import org.w3.swap
-import swap.logic.{Formula, And, Exists, Term}
-import swap.rdf.{URI, BlankNode, AbstractSyntax, Vocabulary}
-import AbstractSyntax.{atom, plain, data, text}
+import swap.logic.{Formula, And, Exists, Term, Variable}
+import swap.rdf.{URI, BlankNode, Holds, AbstractSyntax, Vocabulary}
+import AbstractSyntax.{plain, data, text}
 
 
 /**
@@ -27,7 +28,7 @@ class NTriplesParser extends NTriplesStrings {
       val atoms = for(Some(f) <- lines) yield f
       val vars = atoms.flatMap(f => f.variables)
       if (vars.isEmpty) And(atoms)
-      else { Exists(vars.toList.removeDuplicates, And(atoms)) }
+      else { Exists(ListSet.empty[Variable] ++ vars, And(atoms)) }
     }
   }
 
@@ -43,7 +44,7 @@ class NTriplesParser extends NTriplesStrings {
 
   def triple: Parser[Option[Formula]] =
     subject ~ ws_p ~ predicate ~ ws_p ~ `object` <~ ws_s <~ "." <~ ws_s ^^ {
-    case s~_~p~_~o => Some(atom(s, p, o))
+    case s~_~p~_~o => Some(Holds(s, p, o))
   }
 
   def subject: Parser[Term] = uriref | nodeID
@@ -91,7 +92,7 @@ class NTriplesParser extends NTriplesStrings {
       case Success(f, _) => f
       case other => {  // not RDF
 	println("@@syntax error in toFormula" + other)
-	Forall(Nil, And(Nil))
+	Forall(Set.empty, And(Nil))
       }
     }
   }
