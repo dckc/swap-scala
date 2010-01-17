@@ -5,11 +5,29 @@ import scala.util.parsing.combinator.{Parsers, RegexParsers}
 import scala.collection.immutable.ListSet
 
 import org.w3.swap
-import swap.rdf.{URI, Holds, BlankNode}
+import swap.rdf.{URI, BlankNode}
 import swap.uri.Util.combine
-import swap.logic.{Term, Apply, Variable}
+import swap.logic.{Formula, Atomic,
+		   Term, Apply, Variable,
+		   AbstractSyntax => Logic }
 
 case class QName(pfx: String, ln: String)
+
+object AbstractSyntax {
+  def statement(s: Term, p: Term, o: Term): Formula = {
+    NotNil(Apply('holds, List(s, p, o)))
+  }
+}
+
+case class NotNil(t: Term) extends Atomic {
+  override def terms() = List(t)
+  def subst(sub: Logic.Subst) = NotNil(t.subst(sub))
+  /**
+   * sorta makes terms look like formulas.
+   * Hark to ACL2 where (and ...) is a term, i.e. a function of booleans
+   */
+  override def quote() = t.quote()
+}
 
 /* TODO: bugfix: re-using NTriplesStrings allows extra spaces,
  * e.g. "abc"@ en and "10" ^^<data:#int>
@@ -116,8 +134,9 @@ class N3Lex extends swap.ntriples.NTriplesStrings {
 class N3Parser(val baseURI: String) extends N3Lex {
   import swap.logic.{Formula, Exists, Forall, And,
 		     Term, Variable, Apply, Literal}
-  import swap.rdf.{BlankNode, Holds}
+  import swap.rdf.{BlankNode}
   import swap.rdf.AbstractSyntax.{text, data}
+  import AbstractSyntax.{statement => mkstatement }
 
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()
@@ -192,8 +211,8 @@ class N3Parser(val baseURI: String) extends N3Lex {
     for(prop <- props) {
       val f = prop match {
 	// inverted?
-	case (t2: Term, t3: Term, false) => Holds(t1, t2, t3)
-	case (t2: Term, t3: Term, true) => Holds(t3, t2, t1)
+	case (t2: Term, t3: Term, false) => mkstatement(t1, t2, t3)
+	case (t2: Term, t3: Term, true) => mkstatement(t3, t2, t1)
       }
       scopes.top.statements.push(f)
     }
