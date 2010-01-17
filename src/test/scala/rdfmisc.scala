@@ -147,10 +147,8 @@ class RDFSemantics extends Spec with ShouldMatchers {
 
     it("should do renaming when necessary"){
       val f = mkf("<data:bob> <data:home> _:somewhere .\n")
-      ( conjunction(f, f).quote.print()
-     ) should equal(
-	"(exists (_:somewhere.1 _:somewhere) (and (holds (data:bob) (data:home) _:somewhere) (holds (data:bob) (data:home) _:somewhere.1)))"
-      )
+      ( conjunction(f, f).variables.size
+     ) should equal( 2 )
     }
   }
 
