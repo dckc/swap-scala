@@ -25,6 +25,8 @@ abstract class ConjunctiveKB {
       terms.flatMap {case ap: Application => Some(ap.fun); case _ => None}
     }
 
+    //println("solve: checking goal: " + goal)
+
     goal match {
 
       case goalatom: Atomic => {
@@ -32,6 +34,7 @@ abstract class ConjunctiveKB {
 
 	facts.flatMap {
 	  case fact: Atomic =>
+	    /*@@ should check relation symbol too! */
 	    unifyall(fact.terms(), goalatom.terms(), s).toStream
 	  case _ => Stream.empty
 	}
@@ -44,11 +47,8 @@ abstract class ConjunctiveKB {
   }
 
   def solveall(goals: Iterable[Formula], s: Subst): Stream[Subst] = {
-    goals match {
-      case Nil => Stream.cons(s, Stream.empty)
-      case List(g) => solve(g, s)
-      case g :: tail =>
-	solve(g, s).flatMap(si => solveall(tail, si))
+    if (goals.isEmpty) Stream.cons(s, Stream.empty) else {
+      solve(goals.head, s).flatMap(si => solveall(goals.tail, si))
     }
   }
 
