@@ -285,7 +285,6 @@ class Graph(val arcs: Iterable[Holds]) extends ConjunctiveKB {
 
   def contains(s: Term, p: Term, o: Term): Boolean = {
     val goal = Holds(s, p, o)
-    assert(goal.variables.size == 1)
 
     !solve(goal).isEmpty
   }
