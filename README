@@ -122,3 +122,15 @@ http://www.planetscala.com/
 
 TimBL asked about loading code from the web... 
 http://www.scala-lang.org/docu/files/api/scala/mobile/Location.html
+
+
+[info] == test-compile ==
+[info]   Source analysis: 1 new/modified, 4 indirectly invalidated, 0 removed.
+[info] Compiling test sources...
+[error] /home/connolly/projects/rdfsem/src/test/scala/rdfstdtest.scala:103: not enough arguments for method apply: (n: Int)org.w3.swap.logic.Term in trait LinearSeqLike.
+[error] Unspecified value parameter n.
+[error] 	println(manifest.each(u, rdf_type, what).mkString())
+[error] 	                                              ^
+[error] one error found
+[info] == test-compile ==
+http://programming-scala.labs.oreilly.com/ch03.html#_methods_without_parentheses_and_dots
