@@ -15,11 +15,17 @@ object testSchema {
   final val `NT-Document` = term("NT-Document")
   final val `RDF-XML-Document` = term("RDF-XML-Document")
   final val description = term("description")
+  final val status = term("status")
   final val premiseDocument = term("premiseDocument")
   final val conclusionDocument = term("conclusionDocument")
   final val entailmentRules = term("entailmentRules")
   final val simpleEntailment = term("simpleEntailment")
 }
+
+sealed abstract class TestResult
+case class RunResult(pass: Boolean) extends TestResult
+case class BadTestData(msg: String) extends TestResult
+case class UnsupportedFeature(msg: String) extends TestResult
 
 class EntailmentTestSuite(val manifest: Graph) {
   import swap.rdf.AbstractSyntax.{conjunction, wellformed, rdf_type, plain }
@@ -27,14 +33,22 @@ class EntailmentTestSuite(val manifest: Graph) {
 
   val what = manifest.qvar
 
-  // TODO: change Boolean to Enumeration of Pass, Fail, Skip
-  def run(): Stream[(Term, String, Boolean)] = {
+  def run(): Stream[(Term, String, TestResult)] = {
     for {
       test <- manifest.each(what, rdf_type,
 			    testSchema.PositiveEntailmentTest)
     } yield {
-      val (desc, passed) = run1(test)
-      (test, desc, passed)
+      manifest.any(test, testSchema.description, what) match {
+	case Literal(desc: String) => {
+	  if (!manifest.contains(test, testSchema.status,
+				      Literal("APPROVED")))
+ 	    (test, desc, BadTestData("test not APPROVED"))
+	  else if (!isSimple(test))
+	    (test, desc, UnsupportedFeature("entailment rules beyond simple"))
+	  else (test, desc, run1(test))
+	}
+	case _ => (test, "?", BadTestData("non-Literal description"))
+      }
     }
   }
 
@@ -43,9 +57,6 @@ class EntailmentTestSuite(val manifest: Graph) {
 
     val rules = manifest.each(test, testSchema.entailmentRules, what)
 
-    for(r <- rules)
-      println("@@entailment rules: " + r)
-
     rules.forall {
       case testSchema.simpleEntailment => true
       case URI(i) => i == nsuri
@@ -53,56 +64,32 @@ class EntailmentTestSuite(val manifest: Graph) {
     }
   }
 
-  def run1(test: Term): (String, Boolean) = {
-    val description = manifest.any(test, testSchema.description, what) match {
-      case Literal(s: String) => s
-      case _ => "@@non-Literal description"
-    }
+  def run1(test: Term): RunResult = {
+    val premises = manifest.each(test, testSchema.premiseDocument, what
+			       ).map(t => load(t))
+    val premise = premises.foldLeft(And(Nil):Formula)(
+      (f, g) => conjunction(f, g))
 
-    println("\n\n==== Entailment Test:")
-    println(description)
+    val conclusion = load(manifest.any(test, testSchema.conclusionDocument,
+				       what))
 
-    // TODO: filter by APPROVED
-    if (isSimple(test)) {
-      val premises = manifest.each(test, testSchema.premiseDocument, what
-				 ).map(t => load(t))
-      val premise = premises.foldLeft(And(Nil):Formula)(
-	(f, g) => conjunction(f, g))
-
-      val conclusion = load(manifest.any(test, testSchema.conclusionDocument,
-					 what))
-
-      println("Premises:")
-      println(premises)
-      println("Conjuction of premises:")
-      println(premise)
-      println("entails?")
-      println(conclusion)
-      println("result:" + entails(premise, conclusion))
-
-      (description, entails(premise, conclusion))
-    } else {
-      (description, false)
-    }
+    RunResult(entails(premise, conclusion))
   }
 
   def load(u: Term): Formula = {
-    println("@@loading: ", u)
-
     u match {
       case URI(addr) => {
 	if (manifest.contains(u, rdf_type,
 			      testSchema.`RDF-XML-Document`) ) {
 	  WebData.loadRDFXML(addr)
+	} else if (manifest.contains(u, rdf_type, testSchema.`NT-Document`)) {
+	  WebData.loadNT(addr)
 	} else {
-	  if (manifest.contains(u, rdf_type, testSchema.`NT-Document`)) {
-	    WebData.loadNT(addr)
-	  }
+	  println("@@unknown document type:  for test document " + u)
+	  println(manifest.each(u, rdf_type, what).mkString("types:",
+							      "\n ", "\n"))
+	  And(Nil) // or use Forall(), i.e. non-RDF?
 	}
-	println("@@unknown document type:  for test document " + u)
-	println(manifest.each(u, rdf_type, what))
-
-	And(Nil) // or use Forall(), i.e. non-RDF?
       }
       case _ => {
 	println("@@document term not a URI: " + u)
@@ -118,8 +105,14 @@ object Runner {
   def main(args: Array[String]): Unit = {
     val manifest = new Graph(WebData.loadRDFXML(args(0)))
 
-    for ((test, desc, result) <- new EntailmentTestSuite(manifest).run())
-      println (result, desc, test)
+    for ((test, desc, result) <- new EntailmentTestSuite(manifest).run()) {
+      println()
+      println ("=== ")
+      println()
+      println(test)
+      println(desc)
+      println(result)
+    }
   }
 
 }
