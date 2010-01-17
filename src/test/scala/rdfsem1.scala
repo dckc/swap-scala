@@ -18,24 +18,20 @@ import swap.rdf.AbstractSyntax.wellformed
 object ent extends Properties("RDF 2004 Entailment") {
   import swap.logic.{Formula, And}
   import swap.rdf.{URI, BlankNode}
-  import swap.rdf.AbstractSyntax.{plain, text, data, checkterm, add}
+  import swap.rdf.AbstractSyntax.{plain, text, data, add,
+				  conjunction, skolemize, fresh}
   import swap.rdf.Semantics.{proofs, entails}
 
   val genVar = for {
     n <- Gen.choose(1, 5)
   } yield BlankNode("_:v", Some(n))
 
-/* pruning... having trouble finding interesting cases for transitivity.
   val genURI = for {
     scheme <- Gen.oneOf("http:", "data:", "ftp:", "mailto:")
     auth <- Gen.oneOf("//x.example", "//y.example", "//z.example", "")
     path <- Gen.oneOf("/a", "bob@example")
     frag <- Gen.oneOf("", "#date")
-  } yield URI("data:" + path + frag)
-*/
-  val genURI = for {
-    s <- Gen.oneOf("dan", "bob", "Texas")
-  } yield URI("data:" + s)
+  } yield URI(scheme + auth + path + frag)
 
   val genLiteral = Gen.oneOf(plain("abc"),
 			     data("2006-01-01", URI("<data:#date>")), 
@@ -44,8 +40,7 @@ object ent extends Properties("RDF 2004 Entailment") {
   val genSPO = for {
     s <- Gen.oneOf(genVar, genURI)
     p <- genURI
-    //o <- Gen.oneOf(genVar, genURI, genLiteral)
-    o <- Gen.oneOf(genVar, genURI)
+    o <- Gen.oneOf(genVar, genURI, genLiteral)
   } yield (s, p, o)
 
   val genGraph = for {
@@ -61,46 +56,63 @@ object ent extends Properties("RDF 2004 Entailment") {
       */
     )
     arcs <- Gen.listOfN(size, genSPO)
-  } yield arcs.foldLeft(And(List()): Formula)(
-    (f, spo) => add(f, spo._1, spo._2, spo._3) )
+  } yield {
+    arcs.foldLeft(And(List()): Formula)(
+      (f, spo) => add(f, spo._1, spo._2, spo._3) )
+  }
 
   implicit val arbf: Arbitrary[Formula] = Arbitrary(genGraph)
 
-  property("graphs are well formed") = Prop.forAll((g: Formula) =>
+  property("add() preserves well-formedness") = Prop.forAll((g: Formula) =>
     wellformed(g)
   )
 
-  /********
-  val genFG = for {
-    f <- genGraph
-    g <- genGraph
-  } yield (f, g)
+  property("conjunction preserves well-formedness") =
+    Prop.forAll( (f: Formula, g: Formula) => {
+      wellformed(conjunction(f, g))
+    })
 
-  val genEntailment = genFG suchThat (fg => entails(fg._1, fg._2) )
+  property("f ^ g |= f") =
+    Prop.forAll( (f: Formula, g: Formula) => {
+      entails(conjunction(f, g), f)
+    })
 
-  val genFGH = for {
-    fg <- genEntailment
-    h <- genGraph
-  } yield (fg._1, fg._2, h)
-  ********* */
+  property("f ^ g |= g") =
+    Prop.forAll( (f: Formula, g: Formula) => {
+      entails(conjunction(f, g), g)
+    })
+
+  property("skolemize(f) |= f") =
+    Prop.forAll( (f: Formula) => {
+      entails(skolemize(f, fresh _), f)
+    })
+
+  property("not f |= skolemize(f) when f has variables") =
+    Prop.forAll( (f: Formula) => {
+      !f.variables().isEmpty ==> !(entails(f, skolemize(f, fresh _)))
+    })
 
   property("entailment is transitive") =
-    Prop.forAll( (f: Formula, g: Formula, h: Formula) =>
+    Prop.forAll( (f: Formula, g: Formula, h: Formula) => {
+      wellformed(f, true)
+      wellformed(g, true)
+      wellformed(h, true)
+
       entails(f, g) ==> {
-	println("f |= g")
-	println (f)
-	println (g)
-	println(proofs(f, g))
+	//println("f |= g")
+	//println (f)
+	//println (g)
+	//println(proofs(f, g))
 	entails(g, h) ==> {
-	  println("... and g |= h.")
-	  println(proofs(g, h))
-	  println("does f |= h?")
-	  println (h)
-	  println(proofs(f, h))
+	  //println("... and g |= h.")
+	  //println(proofs(g, h))
+	  //println("does f |= h?")
+	  //println (h)
+	  //println(proofs(f, h))
 	  entails(f, h)
 	}
       }
-   )
+    })
 }
 
 object ntp extends Properties("NTriples parsing") {
@@ -114,7 +126,7 @@ object ntp extends Properties("NTriples parsing") {
 			 "_:x", "_:y", "_:z",
 			 "\"str1\"", "\"str2\"",
 			 "\"str1\"@en", "\"str2\"@fn",
-			 "\"str1\"^^<data:int>", "\"str2\"^^<data:date>"
+			 "\"123\"^^<data:int>", "\"2000-01-01\"^^<data:date>"
 		       )
 
   val gen3 = for {

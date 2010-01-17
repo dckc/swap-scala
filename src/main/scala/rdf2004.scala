@@ -19,16 +19,14 @@ import swap.sexp.SExp.fromSeq
  * TODO: move much of its structure up to Atomic a la Application
  */
 case class Holds(s: Term, p: Term, o: Term) extends Atomic {
-  require(p match {
-    case URI(_) => s match {
-      case BlankNode(_, _) | URI(_) => AbstractSyntax.checkterm(o)
-      case _ => false
-    }
-    case _ => false
-  })
-  
+  require(s match { case BlankNode(_, _) | URI(_) => true; case _ => false } )
+  require(p match { case URI(_) => true; case _ => false } )
+  require(AbstractSyntax.checkterm(o, true))
+
   override def terms() = List(s, p, o)
-  def subst(sub: Logic.Subst) = Holds(s.subst(sub), p.subst(sub), o.subst(sub))
+  def subst(sub: Logic.Subst) = {
+    Holds(s.subst(sub), p.subst(sub), o.subst(sub))
+  }
 
   override def quote() = Cons('holds, fromSeq(terms.map(t => t.quote())))
 }
@@ -59,12 +57,11 @@ case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
 
   override def fresh() = BlankNode(n, Some(new Thing()))
 }
+object Counter {
+  protected var cur = 0
+  def next(): Int = { cur += 1; cur }
+}
 class Thing {
-  object Counter {
-    protected var cur = 0
-    def next(): Int = { cur += 1; cur }
-  }
-  
   private val id = Counter.next()
   override def toString = id.toString()
 }
@@ -86,7 +83,7 @@ object AbstractSyntax {
   def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
   def xml(x: NodeSeq): Term = Apply('xml, List(Literal(x)))
 
-  def checkterm(t: Term): Boolean = {
+  def checkterm(t: Term, die: Boolean): Boolean = {
     t match {
       case BlankNode(_, _) => true
       /* TODO detail: URI syntax */
@@ -101,7 +98,8 @@ object AbstractSyntax {
 			     Literal(s: String) )) => true
       case Apply('xml, List(Literal(e: NodeSeq))) => true
 
-      case _ => false
+      case Apply(_, Nil) => true // @@allow skolem terms, for now...
+      case _ => if (die) throw new Exception("bad term: " + t) else false
     }
   }
 
@@ -109,28 +107,29 @@ object AbstractSyntax {
    * TODO: normalize() that can do e.g. And(And(f, g), h) => And(f, g, h)
    * then wellformed is just (a) no free vars, and (b) all terms check.
    */
-  def wellformed(f: Formula): Boolean = {
+  def wellformed(f: Formula): Boolean = wellformed(f, false)
+  def wellformed(f: Formula, die: Boolean): Boolean = {
 
-    def wfatom(f: Formula): Boolean = {
+    def wfatom(f: Formula, die: Boolean): Boolean = {
       f match {
-	case Holds(s, p, o) => checkterm(s) && checkterm(p) && checkterm(o)
-	case _ => false
+	case Holds(s, p, o) => true
+	case _ => if (die) throw new Exception("not wfatom:" + f) else false
       }
     }
 
-    def wfconj(fmlas: Iterable[Formula]): Boolean = {
-      fmlas.forall(f => wfatom(f))
+    def wfconj(fmlas: Iterable[Formula], die: Boolean): Boolean = {
+      fmlas.forall(f => wfatom(f, die))
     }
     
     if (f.freevars().isEmpty) {
       f match {
 	case Exists(vs, And(fmlas)) => {
-	  if (vs.isEmpty) false else wfconj(fmlas)
+	  if (vs.isEmpty) false else wfconj(fmlas, die)
 	}
 	case And(fmlas) => {
-	  wfconj(fmlas)
+	  wfconj(fmlas, die)
 	}
-	case _ => wfatom(f)
+	case _ => wfatom(f, die)
       }
     } else false
   }
@@ -142,7 +141,7 @@ object AbstractSyntax {
    * preserves order of Atoms in And()
    * */
   def add (f: Formula, s: Term, p: Term, o: Term): Formula = {
-    assert(wellformed(f))
+    wellformed(f, true)
 
     val g = Holds(s, p, o)
     val vg = g.variables
@@ -164,7 +163,8 @@ object AbstractSyntax {
   }
 
   def fresh(): Application = {
-    Apply(Symbol("skolem" + new Thing()), Nil)
+    val i = "http://www.w3.org/2000/10/swap/log#skolem@@" + new Thing()
+    URI(i)
   }
 
 
@@ -192,8 +192,8 @@ object AbstractSyntax {
   def conjunction(f: Formula, g: Formula): Formula = {
     import Logic.mksubst
 
-    assert(wellformed(f))
-    assert(wellformed(g))
+    assert(wellformed(f, true))
+    assert(wellformed(g, true))
 
     def mkand(f: Formula, g: Formula): Formula = {
       (f, g) match {
@@ -211,13 +211,16 @@ object AbstractSyntax {
 	  val (sub, freshvars) = mksubst(shared, Nil, 
 					 shared.iterator.next, Map())
 	  val g3 = gg.subst(sub)
-	  (Set() ++ freshvars, g3)
+	  (Set() ++ freshvars ++ (vg filterNot (shared contains)), g3)
 	}
 
 	Exists(vf ++ vg2, mkand(ff, g2))
       }
       case (Exists(vf, ff), _) => {
 	Exists(vf, mkand(ff, g))
+      }
+      case (_, Exists(vg, gg)) => {
+	Exists(vg, mkand(f, gg))
       }
       case (_, _) => mkand(f, g)
     }
@@ -301,8 +304,8 @@ object Semantics {
   }
 
   def proofs(f: Formula, g: Formula): Stream[Logic.Subst] = {
-    assert(wellformed(f))
-    assert(wellformed(g))
+    assert(wellformed(f, true))
+    assert(wellformed(g, true))
 
     val fmlas = f match {
       case atom: Holds => List(atom)

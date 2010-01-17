@@ -96,7 +96,7 @@ class RDFSyntax extends Spec with ShouldMatchers {
 
     it ("should handle a bit larger graph") {
       (gmore.quote().print()) should equal (
-	"(exists (_:home.1 who.2) (and (holds (data:bob) (data:home) _:home.1) (holds _:home.1 (data:in) (data:Texas)) (holds (data:bob) (data:friend) who.2) (holds who.2 (data:home) _:home.1)))"
+	"(exists (who.2 _:home.1) (and (holds (data:bob) (data:home) _:home.1) (holds _:home.1 (data:in) (data:Texas)) (holds (data:bob) (data:friend) who.2) (holds who.2 (data:home) _:home.1)))"
       )
     }
 
