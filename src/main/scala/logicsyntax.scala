@@ -214,7 +214,7 @@ object AbstractSyntax {
   def unify(tt1: Term, tt2: Term, s: Subst): Option[Subst] = {
     val t1 = lookup(tt1, s)
     val t2 = lookup(tt2, s)
-    if (t1 eq t2) Some(s)
+    if (t1 == t2) Some(s)
     else t1 match {
       case v1: Variable => Some(s + (v1 -> t2))
       case a1: Application => t2 match {
@@ -243,7 +243,7 @@ object AbstractSyntax {
 
   def matchTerm(pattern: Term, data: Term, s: Subst): Option[Subst] = {
     val pat = lookup(pattern, s)
-    if (pat eq data) Some(s)
+    if (pat == data) Some(s)
     else pat match {
       case v1: Variable => Some(s + (v1 -> data))
       case a1: Application => data match {
