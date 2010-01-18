@@ -202,6 +202,20 @@ _:somewhere <data:in> <data:Texas>.
      ) should equal (true)
     }
 
+    it("should not bind the same var to 2 terms") {
+      ( entails(mkf("""#
+<data:dan> <data:home> <data:Austin>.
+<data:bob> <data:home> <data:Texas>.
+"""
+		  ),
+		mkf("""
+<data:dan> <data:home> _:somewhere.
+<data:bob> <data:home> _:somewhere.
+"""
+		  ))
+     ) should equal (false)
+    }
+
     it("should handle variable loops, out-of-order triples") {
       ( entails(mkf("""#
 <data:bob> <data:home> <data:Dallas>.

@@ -11,7 +11,7 @@ package org.w3.swap.logic
  * 
  */
 abstract class ConjunctiveKB {
-  import AbstractSyntax.{Subst, unifyall}
+  import AbstractSyntax.{Subst, matchAll}
 
   def getData(tokens: Seq[Any]): Stream[Formula]
 
@@ -35,7 +35,7 @@ abstract class ConjunctiveKB {
 	facts.flatMap {
 	  case fact: Atomic =>
 	    /*@@ should check relation symbol too! */
-	    unifyall(fact.terms(), goalatom.terms(), s).toStream
+	    matchAll(goalatom.terms(), fact.terms(), s).toStream
 	  case _ => Stream.empty
 	}
       }

@@ -102,9 +102,9 @@ class NTriplesParser extends NTriplesStrings {
 /* this is factored out for re-use in n3 */
 class NTriplesStrings extends RegexParsers {
   def literal: Parser[Term] = string ~ opt("@"~language | "^^"~datatype) ^^ {
-    case str ~ None => plain(dequote(str))
+    case str ~ None => plain(str)
 
-    case str ~ Some("@" ~ lang) => text(dequote(str), lang.substring(1))
+    case str ~ Some("@" ~ lang) => text(str, lang)
 
     case lex ~ Some("^^" ~ dt) => data(lex, mkuri(dt))
   }

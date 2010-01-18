@@ -32,20 +32,29 @@ class EntailmentTestSuite(val manifest: Graph) {
   import swap.rdf.Semantics.entails
 
   val what = manifest.qvar
+  val what2 = what.fresh()
 
   def run(): Stream[(Term, String, TestResult)] = {
     for {
-      test <- manifest.each(what, rdf_type,
-			    testSchema.PositiveEntailmentTest)
+      (test, td, o) <- manifest.arcsMatching(what, testSchema.description,
+					     what2)
     } yield {
-      manifest.any(test, testSchema.description, what) match {
+      o match {
 	case Literal(desc: String) => {
 	  if (!manifest.contains(test, testSchema.status,
-				      Literal("APPROVED")))
+				 Literal("APPROVED")))
  	    (test, desc, BadTestData("test not APPROVED"))
-	  else if (!isSimple(test))
-	    (test, desc, UnsupportedFeature("entailment rules beyond simple"))
-	  else (test, desc, run1(test))
+	  else manifest.any(test, rdf_type, what) match {
+	    case testSchema.PositiveEntailmentTest => {
+	      (test, desc, entailmentTest(test, true))
+	    }
+	    case testSchema.NegativeEntailmentTest => {
+	      (test, desc, entailmentTest(test, false))
+	    }
+	    case t => {
+	      (test, desc, UnsupportedFeature("test type: " + t))
+	    }
+	  }
 	}
 	case _ => (test, "?", BadTestData("non-Literal description"))
       }
@@ -64,16 +73,25 @@ class EntailmentTestSuite(val manifest: Graph) {
     }
   }
 
-  def run1(test: Term): RunResult = {
-    val premises = manifest.each(test, testSchema.premiseDocument, what
-			       ).map(t => load(t))
-    val premise = premises.foldLeft(And(Nil):Formula)(
-      (f, g) => conjunction(f, g))
+  def entailmentTest(test: Term, expected: Boolean): TestResult = {
+    if (!isSimple(test))
+      UnsupportedFeature("entailment rules beyond simple")
+    else {
+      val premises = manifest.each(test, testSchema.premiseDocument, what
+				 ).map(t => load(t))
+      val premise = premises.foldLeft(And(Nil):Formula)(
+	(f, g) => conjunction(f, g))
 
-    val conclusion = load(manifest.any(test, testSchema.conclusionDocument,
-				       what))
+      val conclusion = load(manifest.any(test, testSchema.conclusionDocument,
+					 what))
+      println()
+      println(test)
+      println("premise: " + premise)
+      println("entails?" + expected)
+      println("conclusion: " + conclusion)
 
-    RunResult(entails(premise, conclusion))
+      RunResult(entails(premise, conclusion) == expected)
+    }
   }
 
   def load(u: Term): Formula = {

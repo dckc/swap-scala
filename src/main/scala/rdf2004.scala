@@ -77,9 +77,15 @@ object AbstractSyntax {
   final val rdf_type = URI(Vocabulary.`type`)
 
   def plain(s: String): Term = Literal(s)
-  def text(s: String, code: String): Term = Apply('text,
-						  List(Literal(code),
-						       Literal(s)))
+
+  /**
+   * @param code a language code; gets normalized to lower case in the term.
+   */
+  def text(s: String, code: String): Term = {
+    Apply('text,
+	  List(Literal(code.toLowerCase),
+	       Literal(s)))
+  }
   def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
   def xml(x: NodeSeq): Term = Apply('xml, List(Literal(x)))
 
@@ -91,9 +97,11 @@ object AbstractSyntax {
       case Literal(s: String) => true
 
       /* TODO detail: lang code syntax */
-      /* TODO: canonical case of lang code */
       case Apply('text, List(Literal(s: String),
-			     Literal(code: String) )) => true
+			     Literal(code: String) )) => {
+			       // code must be in canonical case
+			       code == code.toLowerCase
+			     }
       case Apply('data, List(URI(_),
 			     Literal(s: String) )) => true
       case Apply('xml, List(Literal(e: NodeSeq))) => true
@@ -261,6 +269,15 @@ class Graph(val arcs: Iterable[Holds]) extends ConjunctiveKB {
   }
 
 
+  def arcsMatching(s: Term, p: Term, o: Term): Stream[(Term, Term, Term)] = {
+    val goal = Holds(s, p, o)
+    solve(goal).map (
+      solution => {
+	val result = goal.subst(solution)
+	(result.s, result.p, result.o)
+      })
+  }
+
   /**
    * @param s: a Term. exactly 1 of s, p, o is a Variable
    * @param p: a Term. exactly 1 of s, p, o is a Variable
@@ -309,13 +326,7 @@ object Semantics {
     val fmlas = f match {
       case atom: Holds => List(atom)
       case And(atoms) => atoms
-      case Exists(_, _) => {
-	val fskol = skolemize(f, fresh _ )
-	fskol match {
-	  case Exists(vars, And(atoms)) => atoms
-	  case _ => throw new Exception("skolemize() is broken")
-	}
-      }
+      case Exists(vars, And(atoms)) => atoms
       case _ => {
 	throw new Exception("wellformed() is broken")
       }

@@ -241,6 +241,35 @@ object AbstractSyntax {
     }
   }
 
+  def matchTerm(pattern: Term, data: Term, s: Subst): Option[Subst] = {
+    val pat = lookup(pattern, s)
+    if (pat eq data) Some(s)
+    else pat match {
+      case v1: Variable => Some(s + (v1 -> data))
+      case a1: Application => data match {
+	case v2: Variable => None
+	case a2: Application => {
+	  if (a1.fun == a2.fun) matchAll(a1.args, a2.args, s)
+	  else None
+	}
+      }
+    }
+  }
+
+  def matchAll(pats: Seq[Term], data: Seq[Term], s: Subst): Option[Subst] = {
+    (pats.isEmpty, data.isEmpty) match {
+      case (true, true) => Some(s)
+      case (true, false) => None
+      case (false, true) => None
+      case _ => {
+	matchTerm(pats.head, data.head, s) match {
+	  case None => None
+	  case Some(ss) => matchAll(pats.tail, data.tail, ss)
+	}
+      }
+    }
+  }
+
   def renamevars(f: Formula, todo: Set[Variable], root: Variable): Formula = {
     val (sub, _) = mksubst(todo, Nil, root, Map())
     f.subst(sub)
