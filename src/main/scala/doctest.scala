@@ -45,18 +45,22 @@ object DocTest {
     var i = 0
     for (ex <- examples(source)) {
       i += 1
-      
-      println("  test(\"" + i + " TODO: test names.\") {")
-      println("    //@@TODO: what to import?")
-      println("    val actual = (")
-      for (line <- ex.source.split("\\\n"))
-	println("      " + line)
-      println("    )")
-      println()
-      println("    actual.isTypeOf[" + ex.wantType + "] should equal (true) ")
-      println("    actual.toString should equal == (" + quote(ex.want) + ")")
-      println("  }")
-      println()
+
+      if (ex.wantType == null) { // an import
+	println("ex.want")
+	println()
+      } else{
+	println("  test(\"" + i + " TODO: test names.\") {")
+	println("    val actual = (")
+	for (line <- ex.source.split("\\\n"))
+	  println("      " + line)
+	println("    )")
+	println()
+	println("    actual.isTypeOf[" + ex.wantType + "] should equal (true) ")
+	println("    actual.toString should equal == (" + quote(ex.want) + ")")
+	println("  }")
+	println()
+      }
     }
     println("}")
   }
@@ -98,7 +102,10 @@ object DocTest {
    * scala> (1 +
    *      | 2)
    * res0: Int = 3
-   * 
+   *
+   * Imports look like this:
+   * scala> import org.w3.swap.test
+   * import org.w3.swap.test
    */
   def examples(s: String): Iterator[Example] = {
     example_re.findAllIn(s).matchData.map(m => {
@@ -113,15 +120,18 @@ object DocTest {
       val want3 = (want_lines.map(wl => wl.substring(indent))
 		 ).mkString("\n")
 
-      // split res0: Int = 3
-      // into Int and 3
-      val xtv = want3.split(" = ", 2)
-      if (xtv.length == 2) {
-	val xt = xtv(0).split(": ", 2)
-	if (xt.length == 2) {
-	  Example(source, xt(1), xtv(1))
+      if (want3.startsWith("import ")) Example(source, null, want3)
+      else{
+	// split res0: Int = 3
+	// into Int and 3
+	val xtv = want3.split(" = ", 2)
+	if (xtv.length == 2) {
+	  val xt = xtv(0).split(": ", 2)
+	  if (xt.length == 2) {
+	    Example(source, xt(1), xtv(1))
+	  } else throw new ParseException("expected resN: type = val", 0)
 	} else throw new ParseException("expected resN: type = val", 0)
-      } else throw new ParseException("expected resN: type = val", 0)
+      }
     })
   }
 }
