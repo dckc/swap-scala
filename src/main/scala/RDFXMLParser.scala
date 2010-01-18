@@ -5,12 +5,12 @@ import AbstractSyntax.rdf_type
 import org.w3.swap
 import swap.uri.Util.combine
 
-import scala.xml.{Elem, NodeSeq, Node}
+import scala.xml.{Elem, NodeSeq, Node, PrefixedAttribute}
 
 class RDFXMLParser(base: String) {
   import Vocabulary.nsuri
   import org.w3.swap.logic.{Formula, Exists, And, Term}
-  import AbstractSyntax.{plain, data, text}
+  import AbstractSyntax.{plain, data, text, xml}
 
   import scala.collection.mutable
   val statements = new mutable.Stack[Formula]()
@@ -62,6 +62,14 @@ class RDFXMLParser(base: String) {
       }
     }
 
+    ne.attributes.foreach {
+      case PrefixedAttribute(ns, local, value, _) 
+      if ne.getNamespace(ns) != nsuri =>
+	statements.push(Holds(subject, URI(ne.getNamespace(ns) + local),
+			      plain(value.text)))
+      case _ => None // never mind. perhaps check for errors.
+    }
+
     subject
   }
 
@@ -69,26 +77,28 @@ class RDFXMLParser(base: String) {
     children foreach {
       case e: Elem => {
 	val res = e \ attr_resource
+	val nid = e \ attr_nodeID
 	val pt = e \ attr_parseType
 	val dt = e \ attr_datatype
 	val lang = e \ attr_lang
 	val elems = e.child.filter(c => c.isInstanceOf[Elem])
 
-	val obj = (!res.isEmpty, pt.text, elems.length) match {
-	  case (true, _, _) => URI(combine(base, res.text))
-	  case (false, "Resource", _) => {
+	val obj = (!res.isEmpty, !nid.isEmpty, pt.text, elems.length) match {
+	  case (true, _, _, _) => URI(combine(base, res.text))
+	  case (false, true, _, _) => BlankNode(nid.text, None)
+	  case (false, false, "Resource", _) => {
 	    val r = blank.fresh()
 	    parseProperties(r, e.child)
 	    r
 	  }
-	  case (false, "Literal", _) => throw new Exception("@@TODO: XML")
-	  case (false, "Collection", _) =>
-	    throw new Exception("@@TODO: Collection")
-	  case (false, "", 1) => parseNodeElement(elems(0).asInstanceOf[Elem])
-	  case (false, "", 0) if !dt.isEmpty =>
+	  case (false, false, "Literal", _) => xml(e.child)
+	  case (false, false, "Collection", _) => plain("@@TODO: Collection")
+	  case (false, false, "", 1) =>
+	    parseNodeElement(elems(0).asInstanceOf[Elem])
+	  case (false, false, "", 0) if !dt.isEmpty =>
 	    data(e.text, URI(combine(base, dt.text)))
-	  case (false, "", 0) if !lang.isEmpty => text(e.text, lang.text)
-	  case (false, "", 0) => plain(e.text)
+	  case (false, false, "", 0) if !lang.isEmpty => text(e.text, lang.text)
+	  case (false, false, "", 0) => plain(e.text)
 	  case _ => 
 	    throw new Exception("@@bad object syntax")
 	}
