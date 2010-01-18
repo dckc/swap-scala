@@ -140,9 +140,8 @@ object Runner {
       println()
       println ("=== ")
       println()
-      println(test)
+      println("" + result + test)
       println(desc)
-      println(result)
     }
   }
 

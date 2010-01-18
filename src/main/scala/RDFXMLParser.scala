@@ -80,29 +80,33 @@ class RDFXMLParser(base: String) {
 	val nid = e \ attr_nodeID
 	val pt = e \ attr_parseType
 	val dt = e \ attr_datatype
-	val lang = e \ attr_lang
+	val lang = e \ attr_lang // @@TODO: look on ancestors
 	val elems = e.child.filter(c => c.isInstanceOf[Elem])
 
-	val obj = (!res.isEmpty, !nid.isEmpty, pt.text, elems.length) match {
-	  case (true, _, _, _) => URI(combine(base, res.text))
-	  case (false, true, _, _) => BlankNode(nid.text, None)
-	  case (false, false, "Resource", _) => {
+	val obj = (pt.text, elems.length) match {
+	  case ("Resource", _) => {
 	    val r = blank.fresh()
 	    parseProperties(r, e.child)
 	    r
 	  }
-	  case (false, false, "Literal", _) => xml(e.child)
-	  case (false, false, "Collection", _) => plain("@@TODO: Collection")
-	  case (false, false, "", 1) =>
+	  case ("Literal", _) => xml(e.child)
+	  case ("Collection", _) => plain("@@TODO: Collection")
+	  case ("", 1) =>
 	    parseNodeElement(elems(0).asInstanceOf[Elem])
-	  case (false, false, "", 0) if !dt.isEmpty =>
+	  case ("", 0) if !res.isEmpty => URI(combine(base, res.text))
+	  case ("", 0) if !nid.isEmpty => BlankNode(nid.text, None)
+	  case ("", 0) if !dt.isEmpty =>
 	    data(e.text, URI(combine(base, dt.text)))
-	  case (false, false, "", 0) if !lang.isEmpty => text(e.text, lang.text)
-	  case (false, false, "", 0) => plain(e.text)
+	  case ("", 0) if !lang.isEmpty => text(e.text, lang.text)
+	  case ("", 0) => plain(e.text)
 	  case _ => 
 	    throw new Exception("@@bad object syntax")
 	}
 	statements.push(Holds(subject, euri(e), obj))
+
+	/* TODO: 2.12 Omitting Nodes: Property Attributes on an
+	 * empty Property Element. (ugh. maybe not.)
+	 */
       }
       case _ => // TODO: check that only whitespace goes here.
     }
