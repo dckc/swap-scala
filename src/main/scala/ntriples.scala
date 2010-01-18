@@ -118,7 +118,7 @@ class NTriplesStrings extends RegexParsers {
   protected def mkuri(str: String) = URI(dequote(str))
 
   protected def dequote(str: String) = {
-    assert(!str.contains("\\"), "TODO: escapes in URIs, strings")
-    str.substring(1, str.length() - 1)
+    import swap.StringUtil.{dequote => unescape}
+    unescape(str.substring(1, str.length() - 1))
   }
 }
