@@ -51,10 +51,11 @@ see project/build/rdfsem.scala for dependency info (i.e. sbt config)
 
 audit trail:
 
-
-134e44e306cdca626ef0d7b35cc646f1  sbt-launcher-0.5.6.jar
-http://simple-build-tool.googlecode.com/files/sbt-launcher-0.5.6.jar
+http://simple-build-tool.googlecode.com/files/xsbt-launch-0.6.10.jar
 <- http://code.google.com/p/simple-build-tool/
+~/bin$ md5sum xsbt-launch-0.6.10.jar 
+54ccec7e4c95c2b2ce1440caae7be7f9  xsbt-launch-0.6.10.jar
+
 
 ~/projects/rdfsem/lib_managed/test$ md5sum *
 18fec285fe7254553b3cfe392e617577  scalacheck-1.6.jar
