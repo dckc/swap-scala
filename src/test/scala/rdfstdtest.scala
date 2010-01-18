@@ -12,6 +12,7 @@ object testSchema {
 
   final val PositiveEntailmentTest = term("PositiveEntailmentTest")
   final val NegativeEntailmentTest = term("NegativeEntailmentTest")
+  final val PositiveParserTest = term("PositiveParserTest")
   final val `NT-Document` = term("NT-Document")
   final val `RDF-XML-Document` = term("RDF-XML-Document")
   final val description = term("description")
@@ -20,6 +21,8 @@ object testSchema {
   final val conclusionDocument = term("conclusionDocument")
   final val entailmentRules = term("entailmentRules")
   final val simpleEntailment = term("simpleEntailment")
+  final val inputDocument = term("inputDocument")
+  final val outputDocument = term("outputDocument")
 }
 
 sealed abstract class TestResult
@@ -50,6 +53,9 @@ class EntailmentTestSuite(val manifest: Graph) {
 	    }
 	    case testSchema.NegativeEntailmentTest => {
 	      (test, desc, entailmentTest(test, false))
+	    }
+	    case testSchema.PositiveParserTest => {
+	      (test, desc, positiveParserTest(test))
 	    }
 	    case t => {
 	      (test, desc, UnsupportedFeature("test type: " + t))
@@ -92,6 +98,13 @@ class EntailmentTestSuite(val manifest: Graph) {
 
       RunResult(entails(premise, conclusion) == expected)
     }
+  }
+
+  def positiveParserTest(test: Term): TestResult = {
+    val fin = load(manifest.any(test, testSchema.inputDocument, what))
+    val fout = load(manifest.any(test, testSchema.outputDocument, what))
+
+    RunResult(entails(fin, fout) && entails(fout, fin))
   }
 
   def load(u: Term): Formula = {
