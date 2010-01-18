@@ -13,14 +13,15 @@ Goals
 
 Testing Plan
  * standard RDF entailment tests, which need
-   * RDF/XML parser (working; not feature-complete)
-   * n-triples parser (working; not feature-complete)
+   * RDF/XML parser (working well enough to do RDF (not RDFS) entailment tests)
+   * n-triples parser (done)
    * RDF proof generator, or
      * N3 proof reader and use cwm to generate proofs
    * RDF proof checker (entailment method is done)
      Currently, we have an RDF entailment method, though some questions
      about variable handling remain.
- * standard RDF positive/negative syntax tests (optional)
+ * standard RDF positive/negative syntax tests (done except xml:base;
+   there are other missing features, but they can come another day)
  * Dave's turtle syntax tests (optional), which needs
    * turtle parser or perhaps just
      * N3 parser (working; feature complete for turtle high level structures,
