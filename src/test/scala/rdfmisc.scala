@@ -248,5 +248,21 @@ _:somebody <data:visited> _:where.
      ) should equal (false)
     }
 
+    it("should not loop endlessly") {
+      ( entails(mkf("""#
+_:j0A <http://example.org/property1> _:j0A .
+_:j2 <http://example.org/property2> _:j1B .
+_:j1B <http://example.org/property3> _:j0A .
+"""
+		  ),
+		mkf("""#
+_:j0A <http://example.org/property1> _:j0A .
+_:j2 <http://example.org/property2> _:j1B .
+_:j1B <http://example.org/property3> _:j0A .
+"""
+		  ))
+     ) should equal (true)
+    }
+
   }
 }
