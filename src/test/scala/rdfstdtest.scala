@@ -177,15 +177,21 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 			  testDescription.informationResourceResults,
 			  what)
     } yield {
-      title match {
-	case Literal(titlestr: String) =>
+      (title, indoc, outq) match {
+	case (Literal(titlestr: String), inaddr: URI, outaddr: URI) =>
 	  if (!manifest.contains(test, testDescription.reviewStatus,
 				 testDescription.approved))
  	    (test, titlestr, BadTestData("test not approved"))
 	  else {
-	    (test, titlestr,
-	     UnsupportedFeature("@@RDFa skeleton found: in/out/title" + 
-				indoc + "/" + outq + "/" + title))
+	    val data = WebData.loadRDFa(inaddr.i)
+	    val pattern = WebData.loadSPARQL(outaddr.i)
+
+	    println("@@rdfa parser vs sparqlq")
+	    println(data)
+	    println(pattern)
+	    val result = entails(data, pattern)
+
+	    (test, titlestr, RunResult(result))
 	  }
 	case _ => (test, "?", BadTestData("non-Literal description"))
       }
@@ -218,10 +224,12 @@ object Runner {
 }
 
 object WebData {
+  import java.io.InputStreamReader
+  import scala.xml.XML
+
   // TODO: conneg
 
   def loadRDFXML(addr: String): Formula = {
-    import scala.xml.XML
     import org.w3.swap.rdf.RDFXMLParser
 
     val e = XML.load(addr)
@@ -229,18 +237,17 @@ object WebData {
     p.parse(e)
   }
 
+  protected def content(addr: String): InputStreamReader = {
+    val conn = new java.net.URL(addr).openConnection()
+    new InputStreamReader(conn.getInputStream())
+  }
+
   /**
    * @throws IOException if openConnection(addr) throws one
    */
   def loadNT(addr: String): Formula = {
-    import java.io.InputStreamReader
-    import swap.ntriples.NTriplesParser
-    
-    val conn = new java.net.URL(addr).openConnection()
-    val in = new InputStreamReader(conn.getInputStream())
-
-    val p = new NTriplesParser()
-    p.parseAll(p.ntripleDoc, in) match {
+    val p = new swap.ntriples.NTriplesParser()
+    p.parseAll(p.ntripleDoc, content(addr)) match {
       case p.Success(f, _) => f
       case failure => {
 	println("@@parse failure:")
@@ -248,6 +255,28 @@ object WebData {
 	And(Nil)
       }
     }
+  }
+
+  def loadSPARQL(addr: String): Formula = {
+    val p = new swap.sparql.SPARQLParser(addr)
+
+    p.parseAll(p.AskQuery, content(addr)) match {
+      case p.Success(f, _) => f
+      case failure => {
+	// TODO: throw exception
+	println("SPARQL @@parse failure:")
+	println(failure)
+	And(Nil)
+      }
+    }
+  }
+    
+  def loadRDFa(addr: String): Formula = {
+    import org.w3.swap.rdf.RDFaParser
+
+    val e = XML.load(addr)
+    val p = new RDFaParser(addr) // @@TODO: absolutize base?
+    p.parse(e)
   }
 }
 
