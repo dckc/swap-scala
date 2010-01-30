@@ -4,6 +4,7 @@ import org.w3.swap
 import swap.sexp.{SExp, Atom, Cons}
 import swap.sexp.SExp.fromSeq
 
+import scala.annotation.tailrec
 // try to preserve order for testing
 import scala.collection.immutable.ListSet
 
@@ -227,6 +228,7 @@ object AbstractSyntax {
     }
   }
 
+  @tailrec
   def unifyall(ts1: Seq[Term], ts2: Seq[Term], s: Subst): Option[Subst] = {
     (ts1.isEmpty, ts2.isEmpty) match {
       case (true, true) => Some(s)
@@ -256,6 +258,7 @@ object AbstractSyntax {
     }
   }
 
+  @tailrec
   def matchAll(pats: Seq[Term], data: Seq[Term], s: Subst): Option[Subst] = {
     (pats.isEmpty, data.isEmpty) match {
       case (true, true) => Some(s)
@@ -275,6 +278,7 @@ object AbstractSyntax {
     f.subst(sub)
   }
 
+  @tailrec
   def mksubst(todo: Iterable[Variable], done: List[Variable],
 	      root: Variable, s: Subst): (Subst, List[Variable]) = {
     if (todo.isEmpty) (s, done) else {
