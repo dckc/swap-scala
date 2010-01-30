@@ -4,12 +4,17 @@ import org.w3.swap
 import swap.logic.{Formula, Exists, And, Atomic, Term, Literal}
 import swap.rdf.{URI, BlankNode, Graph}
 
-object testSchema {
-
+abstract class Namespace(n: String) {
   protected def term(name: String): URI = {
-    URI("http://www.w3.org/2000/10/rdf-tests/rdfcore/testSchema#" + name)
+    URI(n + name)
   }
+}
 
+/**
+ * per http://www.w3.org/TR/rdf-testcases/
+ */
+object testSchema extends Namespace(
+  "http://www.w3.org/2000/10/rdf-tests/rdfcore/testSchema#") {
   final val PositiveEntailmentTest = term("PositiveEntailmentTest")
   final val NegativeEntailmentTest = term("NegativeEntailmentTest")
   final val PositiveParserTest = term("PositiveParserTest")
@@ -25,19 +30,42 @@ object testSchema {
   final val outputDocument = term("outputDocument")
 }
 
+/**
+ * per http://www.w3.org/TR/test-metadata/
+ */
+object testDescription extends Namespace(
+  "http://www.w3.org/2006/03/test-description#") {
+  final val TestCase = term("TestCase")
+  final val informationResourceInput = term("informationResourceInput")
+  final val informationResourceResults = term("informationResourceResults")
+  final val reviewStatus = term("reviewStatus")
+  final val approved = term("approved")
+  final val purpose = term("purpose")
+}
+
+object dc extends Namespace(
+  "http://purl.org/dc/elements/1.1/") {
+  final val title = term("title")
+}
+
 sealed abstract class TestResult
 case class RunResult(pass: Boolean) extends TestResult
 case class BadTestData(msg: String) extends TestResult
 case class UnsupportedFeature(msg: String) extends TestResult
 
-class EntailmentTestSuite(val manifest: Graph) {
+abstract class TestSuite(val manifest: Graph) {
+  def run(): Stream[(Term, String, TestResult)]
+}
+
+class EntailmentTestSuite(override val manifest: Graph)
+extends TestSuite(manifest) {
   import swap.rdf.AbstractSyntax.{conjunction, wellformed, rdf_type, plain }
   import swap.rdf.Semantics.entails
 
   val what = manifest.qvar
   val what2 = what.fresh()
-
-  def run(): Stream[(Term, String, TestResult)] = {
+  
+  override def run(): Stream[(Term, String, TestResult)] = {
     for {
       (test, td, o) <- manifest.arcsMatching(what, testSchema.description,
 					     what2)
@@ -131,12 +159,55 @@ class EntailmentTestSuite(val manifest: Graph) {
   }
 }
 
+class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
+  import swap.rdf.AbstractSyntax.{rdf_type}
+  import swap.rdf.Semantics.entails
+
+  val what = manifest.qvar
+  val what2 = what.fresh()
+  
+  override def run(): Stream[(Term, String, TestResult)] = {
+    for {
+      test <- manifest.each(what, rdf_type, testDescription.TestCase)
+      title = manifest.any(test, dc.title, what)
+      indoc = manifest.any(test,
+			   testDescription.informationResourceInput,
+			   what)
+      outq = manifest.any(test,
+			  testDescription.informationResourceResults,
+			  what)
+    } yield {
+      title match {
+	case Literal(titlestr: String) =>
+	  if (!manifest.contains(test, testDescription.reviewStatus,
+				 testDescription.approved))
+ 	    (test, titlestr, BadTestData("test not approved"))
+	  else {
+	    (test, titlestr,
+	     UnsupportedFeature("@@RDFa skeleton found: in/out/title" + 
+				indoc + "/" + outq + "/" + title))
+	  }
+	case _ => (test, "?", BadTestData("non-Literal description"))
+      }
+    }
+  }
+}
+
 
 object Runner {
   def main(args: Array[String]): Unit = {
-    val manifest = new Graph(WebData.loadRDFXML(args(0)))
+    val manifest = new Graph(WebData.loadRDFXML(args(1)))
 
-    for ((test, desc, result) <- new EntailmentTestSuite(manifest).run()) {
+    val results = args(0) match {
+      case "--entailment" => new EntailmentTestSuite(manifest).run()
+      case "--rdfa" => new RDFaTestSuite(manifest).run()
+      case _ => {
+	println("Usage: rdfstdtest --entailment|--rdfa manifest")
+	Stream.empty
+      }
+    }
+
+    for ((test, desc, result) <- results) {
       println()
       println ("=== ")
       println()
@@ -144,7 +215,6 @@ object Runner {
       println(desc)
     }
   }
-
 }
 
 object WebData {
