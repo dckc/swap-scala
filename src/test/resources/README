@@ -1,0 +1,8 @@
+current_document.html is from section 6.1.1.1. The current document
+of http://www.w3.org/TR/rdfa-syntax/ , modified to add namespaces
+from earlier in the doc.
+
+current_document.ttl is the expected output there.
+
+see swap.test.RDFaExample() class
+
