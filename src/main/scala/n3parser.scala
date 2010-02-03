@@ -131,12 +131,23 @@ class N3Lex extends swap.ntriples.NTriplesStrings {
  * 
  * @author <a href="http://www.w3.org/People/Connolly/">Dan Connolly</a>
  */
-class N3Parser(val baseURI: String) extends N3Lex {
+class N3Parser(override val baseURI: String) extends TextRDF(baseURI) {
+  def mkstatement(s: Term, p: Term, o: Term): Formula = {
+    swap.n3.AbstractSyntax.statement(s, p, o)
+  }
+}
+
+/**
+ * TextRDF abstracts shared part of turtle, n3, and SPARQL syntax.
+ * TODO: factor out a turtle parser
+ */ 
+abstract class TextRDF(val baseURI: String) extends N3Lex {
   import swap.logic.{Formula, Exists, Forall, And,
 		     Term, Variable, Apply, Literal}
   import swap.rdf.{BlankNode}
   import swap.rdf.AbstractSyntax.{text, data}
-  import AbstractSyntax.{statement => mkstatement }
+
+  def mkstatement(s: Term, p: Term, o: Term): Formula
 
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()

@@ -199,6 +199,21 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
   }
 }
 
+class RDFaExample(indoc: String, outdoc: String) {
+  import swap.rdf.Semantics.entails
+  import swap.rdf.RDFaParser
+
+  def run(): Stream[(Term, String, TestResult)] = {
+    val base = WebData.asURI(indoc)
+    val actual = WebData.loadRDFa(base)
+    val expected = WebData.loadTurtle(WebData.asURI(outdoc), base)
+    val aTest = swap.rdf.BlankNode("test", Some(this.hashCode()))
+
+    val result = entails(actual, expected) && entails(expected, actual)
+    Stream.cons((aTest, indoc, RunResult(result)),
+		Stream.empty)
+  }
+}
 
 object Runner {
   def main(args: Array[String]): Unit = {
@@ -207,6 +222,7 @@ object Runner {
     val results = args(0) match {
       case "--entailment" => new EntailmentTestSuite(manifest).run()
       case "--rdfa" => new RDFaTestSuite(manifest).run()
+      case "--rdfax" => new RDFaExample(args(1), args(2)).run()
       case _ => {
 	println("Usage: rdfstdtest --entailment|--rdfa manifest")
 	Stream.empty
@@ -223,6 +239,9 @@ object Runner {
   }
 }
 
+/**
+ * WebData can read RDF in various formats.
+ */
 object WebData {
   import java.io.InputStreamReader
   import scala.xml.XML
@@ -250,9 +269,25 @@ object WebData {
     p.parseAll(p.ntripleDoc, content(addr)) match {
       case p.Success(f, _) => f
       case failure => {
-	println("@@parse failure:")
-	println(failure)
-	And(Nil)
+	throw new Exception("@@parse failure:" + failure)
+      }
+    }
+  }
+
+  /**
+   * @throws IOException if openConnection(addr) throws one
+   */
+  def loadTurtle(addr: String): Formula = loadTurtle(addr, addr)
+
+  /**
+   * @throws IOException if openConnection(addr) throws one
+   */
+  def loadTurtle(addr: String, base: String): Formula = {
+    val p = new swap.TurtleParser(base)
+    p.parseAll(p.document, content(addr)) match {
+      case p.Success(f, _) => f
+      case failure => {
+	throw new Exception("@@parse failure:" + failure)
       }
     }
   }
@@ -278,6 +313,12 @@ object WebData {
     val p = new RDFaParser(addr) // @@TODO: absolutize base?
     p.parse(e)
   }
-}
 
-    
+  /**
+   * Convert a (local) file path to a URI.
+   */
+  def asURI(fp: String): String = {
+    val cwd = java.lang.System.getProperty("user.dir")
+    new java.io.File(cwd, fp).toURI().toString()
+  }
+}

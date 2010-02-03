@@ -9,6 +9,11 @@ import scala.xml.{Elem}
 /**
  * This parser is host-language neutral, so caller must
  * fish base out of HTML head.
+ *
+ * @See: <a href="http://www.w3.org/TR/rdfa-syntax/"
+ * >RDFa in XHTML: Syntax and Processing</a>
+ * W3C Recommendation 14 October 2008
+ * 
  */
 class RDFaParser(base: String) {
   import AbstractSyntax.{plain, text, data, rdf_type}
