@@ -1,138 +1,24 @@
-=============
-RDF Semantics
-=============
+=====================================================
+swap-scala: Toward proof checker for the Semantic Web
+=====================================================
 
-This is a semantics for RDF using more traditional logical structures.
+This is a Semantic Web Application Platform in scala, an independent
+implementation of the tools -- especially the proof checker -- in the
+`original python swap`__.
 
-Goals
- * Implement N3Logic proof checking independent of cwm
- * Influence EricP's scala SQL/SPARQL integration work
- * Influence the Datagraph.org scala RDF work
- * Influence Sandro's RDF2 thinking
- * Influence Pat Hayes's RDF semantics advocacy around "named graphs" and such
+__ http://www.w3.org/2000/10/swap/
 
-Testing Plan
- * standard RDF entailment tests, which need
-   * RDF/XML parser (working well enough to do RDF (not RDFS) entailment tests)
-   * n-triples parser (done)
-   * RDF proof generator, or
-     * N3 proof reader and use cwm to generate proofs
-   * RDF proof checker (entailment method is done)
-     Currently, we have an RDF entailment method, though some questions
-     about variable handling remain.
- * standard RDF positive/negative syntax tests (done except xml:base;
-   there are other missing features, but they can come another day)
- * Dave's turtle syntax tests (optional), which needs
-   * turtle parser or perhaps just
-     * N3 parser (working; feature complete for turtle high level structures,
-       but not low-level details such as string escaping)
-   * RDF entailment method
- * standard RDFS tests, which needs
-   * RDF/XML parser
-   * n-triples parser
-   * RDFS rules in N3Rules
-   * N3Rules proof generator, or
-     * N3 proof reader
-   * N3Rules proof checker
- * standard RIF BLD entailment tests (http://www.w3.org/TR/rif-test/),
-   which needs
-   * RIF BLD XML reader
- * N3 syntax tests (http://www.w3.org/2000/10/swap/test/n3parser.tests), (opt)
-   which needs
-   * N3 parser (working; not feature-complete)
- * some sort of N3Logic proof testing, which needs
-   * N3Logic proof generator and/or N3 proof reader (and use cwm)
-   * N3Logic proof checker
+Notes on Features, Goals, TestPlan, and DevTools are migrating
+out of the code repository into `a google code wiki`__.
+
+__ http://code.google.com/p/swap-scala/w/list
+
+The initial revision of that repository is::
+
+  0:22fb241bb04f Sun Jan 17 04:17:42 2010 +0000
 
 
 directory layout is a la sbt/maven
 http://code.google.com/p/simple-build-tool/wiki/Setup
 
 see project/build/rdfsem.scala for dependency info (i.e. sbt config)
-
-audit trail:
-
-http://simple-build-tool.googlecode.com/files/xsbt-launch-0.6.10.jar
-<- http://code.google.com/p/simple-build-tool/
-~/bin$ md5sum xsbt-launch-0.6.10.jar 
-54ccec7e4c95c2b2ce1440caae7be7f9  xsbt-launch-0.6.10.jar
-
-
-~/projects/rdfsem/lib_managed/test$ md5sum *
-18fec285fe7254553b3cfe392e617577  scalacheck-1.6.jar
-3724d2f7a0b4180fdef0317344b54b71  scalatest-1.0.jar
-
-~/bin$ wget http://simple-build-tool.googlecode.com/files/xsbt-launch-0.6.9.jar
---2010-01-08 22:06:23--  http://simple-build-tool.googlecode.com/files/xsbt-launch-0.6.9.jar
-Resolving simple-build-tool.googlecode.com... 209.85.225.82
-Connecting to simple-build-tool.googlecode.com|209.85.225.82|:80... connected.
-HTTP request sent, awaiting response... 200 OK
-Length: 919329 (898K) [application/x-java-archive]
-Saving to: `xsbt-launch-0.6.9.jar'
-
-100%[======================================>] 919,329      871K/s   in 1.0s    
-
-2010-01-08 22:06:24 (871 KB/s) - `xsbt-launch-0.6.9.jar' saved [919329/919329]
-~/bin$ md5sum xsbt-launch-0.6.9.jar 
-fdb2facd9f5e90d7fce3aac092d3a45d  xsbt-launch-0.6.9.jar
-
-
-
-trying out IDEA
-
-~/projects/rdfsem$ JDK_HOME=/usr/lib/jvm/java-6-openjdk/ /opt/idea-IC-93.13/bin/idea.sh &
-
-http://www.jetbrains.com/idea/download/
-http://download.jetbrains.com/idea/ideaIC-9.0.tar.gz
-
-8c777898c9ef9f08fc27812be4e97db3  ideaIC-9.0.tar.gz
-$ ls -sh ideaIC-9.0.tar.gz
-66M ideaIC-9.0.tar.gz
-
-http://jetbrains.net/confluence/display/SCA/Getting+Started+with+IntelliJ+IDEA+Scala+Plugin
-
-
-XML namespace handling -- clark notation (2.8 only?)
-
-profiling
-
-Getting Started with VisualVM
-https://visualvm.dev.java.net/gettingstarted.html
-
-null from System.console() when using >,x
-
-def vs val in combinator parsing
-
-patterns in for... constructible classes
-
-new scaladoc stylesheet makes links invisble and suppresses bullet points. not easy to scan.
-
-refs:
-
-java API docs
-
-scala API docs
-
-2.8 nightly:
-http://www.scala-lang.org/archives/downloads/distrib/files/nightly/docs/library/index.html
-
-Programming in Scala book
-
-maybe dev tools belongs in advogato blog article?
-
-http://www.planetscala.com/
-
-TimBL asked about loading code from the web... 
-http://www.scala-lang.org/docu/files/api/scala/mobile/Location.html
-
-
-[info] == test-compile ==
-[info]   Source analysis: 1 new/modified, 4 indirectly invalidated, 0 removed.
-[info] Compiling test sources...
-[error] /home/connolly/projects/rdfsem/src/test/scala/rdfstdtest.scala:103: not enough arguments for method apply: (n: Int)org.w3.swap.logic.Term in trait LinearSeqLike.
-[error] Unspecified value parameter n.
-[error] 	println(manifest.each(u, rdf_type, what).mkString())
-[error] 	                                              ^
-[error] one error found
-[info] == test-compile ==
-http://programming-scala.labs.oreilly.com/ch03.html#_methods_without_parentheses_and_dots
