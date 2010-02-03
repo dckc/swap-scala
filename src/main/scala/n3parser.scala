@@ -275,9 +275,26 @@ abstract class TextRDF(val baseURI: String) extends N3Lex {
 */
   )
 
-  def symbol: Parser[Term] = (
+    /* checked wraps a Parser[T] with a check on its results
+     * */
+  protected def checked[T](p: => Parser[T])(
+    check: (T, Input) => ParseResult[T]): Parser[T] = Parser {
+      in => p(in) match {
+	case s @ Success(x, in) => check(x, in)
+	case ns => ns
+      }
+    }
+
+    /* TODO: test whether  'a' allowed in the object spot in n3/turtle.
+     * How about as a datatype? */
+  def symbol: Parser[URI] = (
     uriref ^^ { case ref => URI(combine(baseURI, ref)) }
-    | qname ^^ { case QName(p, l) => URI(namespaces(p) + l) }
+
+    | checked(qname) { case (q, in) => (
+      if (namespaces.isDefinedAt(q.pfx)) Success(q, in)
+      else Error("no such prefix: " + q.pfx, in)
+    ) } ^^ { case QName(p, l) => URI(namespaces(p) + l) }
+
     | "a" ^^ {
       case s => URI("http://www.w3.org/1999/02/22-rdf-syntax-ns#type") }
     | "=" ^^ {
@@ -292,7 +309,7 @@ abstract class TextRDF(val baseURI: String) extends N3Lex {
   override def literal: Parser[Term] = (
     // TODO: can langString and datatypeString use """s too?
     // TODO: left factor string-handling.
-    string ~ "^^" ~ datatype ^^ { case lex~_~dt => data(lex, mkuri(dt)) }
+    string ~ "^^" ~ symbol ^^ { case lex~_~dt => data(lex, dt) }
     | string ~ "@" ~ language ^^ { case s~_~lang => text(s, lang) }
     | string ^^ { case s => Literal(s) }
     | stringLit3 ^^ { case s => Literal(s) }
@@ -300,6 +317,7 @@ abstract class TextRDF(val baseURI: String) extends N3Lex {
     | boolean
     )
 
+  
   def numeral: Parser[Term] = (
     double ^^ { case x => Literal(x) }
     | decimal ^^ { case x => Literal(x) }

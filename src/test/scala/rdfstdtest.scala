@@ -210,6 +210,12 @@ class RDFaExample(indoc: String, outdoc: String) {
     val aTest = swap.rdf.BlankNode("test", Some(this.hashCode()))
 
     val result = entails(actual, expected) && entails(expected, actual)
+
+    if(!result) {
+      println("expected: " + expected)
+      println("actual: " + actual)
+    }
+
     Stream.cons((aTest, indoc, RunResult(result)),
 		Stream.empty)
   }
@@ -217,7 +223,7 @@ class RDFaExample(indoc: String, outdoc: String) {
 
 object Runner {
   def main(args: Array[String]): Unit = {
-    val manifest = new Graph(WebData.loadRDFXML(args(1)))
+    lazy val manifest = new Graph(WebData.loadRDFXML(args(1)))
 
     val results = args(0) match {
       case "--entailment" => new EntailmentTestSuite(manifest).run()
@@ -310,7 +316,8 @@ object WebData {
     import org.w3.swap.rdf.RDFaParser
 
     val e = XML.load(addr)
-    val p = new RDFaParser(addr) // @@TODO: absolutize base?
+    val base = e \ "head" \ "base" \ "@href"
+    val p = new RDFaParser(if (base.isEmpty) addr else base.text)
     p.parse(e)
   }
 
