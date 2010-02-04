@@ -1,35 +1,37 @@
 package org.w3.swap.sexp
 
+import java.io.Writer
+
 sealed abstract class SExp {
   def print(): String = {
-    val b = new StringBuilder()
-    printTo(b)
+    val b = new java.io.StringWriter()
+    writeTo(b)
     b.toString()
   }
 
-  def printTo(builder: StringBuilder)
+  def writeTo(w: Writer)
 }
 
 case class Cons(head: SExp, tail: SExp) extends SExp {
-  import SExp.printTail
+  import SExp.writeTail
 
-  override def printTo(builder: StringBuilder) {
+  override def writeTo(w: Writer) {
 
     head match {
       case Atom('quote) => {
 	tail match {
 	  case Cons(v, _) => {
-	    builder.append("'")
-	    v.printTo(builder)
+	    w.append("'")
+	    v.writeTo(w)
 	  }
 	  case _ => throw new Exception("bad 'quote tail:" + this.toString())
 	}
       }
 
       case _ => {
-	builder.append("(")
-	head.printTo(builder)
-	printTail(tail, builder)
+	w.append("(")
+	head.writeTo(w)
+	writeTail(tail, w)
       }
     }
   }
@@ -38,21 +40,21 @@ case class Cons(head: SExp, tail: SExp) extends SExp {
 }
 
 case class Atom(val x: Any) extends SExp {
-  override def printTo(builder: StringBuilder) {
+  override def writeTo(w: Writer) {
     x match {
       /* lisp syntax, not scala syntax.
        * Well... close, anyway... lowercase symbols
        * and such should print as |foo|. */
-      case s: Symbol => builder.append(s.name)
+      case s: Symbol => w.append(s.name)
       case str: String => {
-	builder.append("\"")
-	builder.append(str) /* @@TODO: escaping */
-	builder.append("\"")
+	w.append("\"")
+	w.append(str) /* @@TODO: escaping */
+	w.append("\"")
       }
-      case i: Int => builder.append(i.toString())
+      case i: Int => w.append(i.toString())
       /* TODO: print decimals as (/ num denom) */
 
-      case _ => throw new Exception("huh? what's that?" + x.toString())
+      case _ => throw new Exception("@@huh? what's that?" + x.toString())
     }
   }
 }
@@ -75,17 +77,17 @@ object SExp {
   implicit def fromSymbol(s: Symbol): SExp = Atom(s)
 
   /* scalaQ: private? */
-  def printTail(e: SExp, builder: StringBuilder) {
+  def writeTail(e: SExp, w: Writer) {
     e match {
       case Cons(h, t) => {
-	builder.append(" ")
-	h.printTo(builder)
-	printTail(t, builder)
+	w.append(" ")
+	h.writeTo(w)
+	writeTail(t, w)
       }
-      case NIL => builder.append(")") // TODO: linebreaks in sexp printing
+      case NIL => w.append(")") // TODO: linebreaks in sexp printing
       case _ => {
-	builder.append(". ")
-	e.printTo(builder)
+	w.append(". ")
+	e.writeTo(w)
       }
     }
   }
