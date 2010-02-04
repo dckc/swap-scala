@@ -186,12 +186,19 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 	    val data = WebData.loadRDFa(inaddr.i)
 	    val pattern = WebData.loadSPARQL(outaddr.i)
 
-	    println("@@rdfa parser vs sparqlq")
-	    println(data.quote().pretty())
-	    println(pattern.quote().pretty())
-	    val result = entails(data, pattern)
-
-	    (test, titlestr, RunResult(result))
+	    if (pattern == null) {
+	      (test, titlestr, UnsupportedFeature("SPARQL parse failure"))
+	    } else {
+	      val result = entails(data, pattern)
+	      if (!result) {
+		println()
+		println("expected (from SPARQL):")
+		println(pattern.quote().pretty())
+		println("actual:")
+		println(data.quote().pretty())
+	      }
+	      (test, titlestr, RunResult(result))
+	    }
 	  }
 	case _ => (test, "?", BadTestData("non-Literal description"))
       }
@@ -304,12 +311,9 @@ object WebData {
     p.parseAll(p.AskQuery, content(addr)) match {
       case p.Success(f, _) => f
       case failure => {
-	// TODO: throw exception
 	println("SPARQL @@parse failure:")
 	println(failure)
-	And(List(Holds(URI("data:sparql"),
-		       URI("data:parse"),
-		       URI("data:failed") )))
+	null
       }
     }
   }

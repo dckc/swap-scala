@@ -4,7 +4,7 @@ import org.w3.swap
 import swap.logic.{Formula, And, Exists, Term}
 import swap.uri.Util.combine
 
-import scala.xml.{Elem}
+import scala.xml
 
 /**
  * This parser is host-language neutral, so caller must
@@ -16,13 +16,13 @@ import scala.xml.{Elem}
  * 
  */
 class RDFaParser(base: String) {
-  import AbstractSyntax.{plain, text, data, rdf_type}
+  import AbstractSyntax.{plain, text, data, rdf_type, xml => xmllit }
 
   import scala.collection.mutable
   val statements = new mutable.Stack[Formula]()
   val blank = BlankNode("node", None) // source of fresh variables
 
-  def parse(e: Elem): Formula = {
+  def parse(e: xml.Elem): Formula = {
     walk(e, URI(base), null, null)
 
     val f1 = And(statements.toList.reverse)
@@ -31,58 +31,176 @@ class RDFaParser(base: String) {
     else Exists(vars, f1)
   }
 
-  def walk(e: Elem, subj1: Term, obj1: Term, lang1: String) {
+  /**
+   * walk element recursively, producing triples
+   * 
+   * based on 5.5. Sequence
+   * http://www.w3.org/TR/rdfa-syntax/#sec_5.5.
+   *
+   * @param subj1: [parent subject] from step 1
+   * @param obj1: [parent object] from step 1
+   * @param lang1: [language] from step 1
+   *
+   * TODO: incomplete triples
+   */
+  def walk(e: xml.Elem, subj1: Term, obj1: Term, lang1: String) {
     assert(subj1 != null) // with NotNull doesn't seem to work. scalaq?
 
-    // TODO: incomplete triples
-    val about = e \ "@about"
-    // TODO: subj can come from @src, @resource, @href
-    val subj = (if (about.isEmpty) subj1
-		else CURIE.ref1(about.text, e, base)
-	      )
+    // step 2., URI mappings, is taken care of by scala.xml
 
-      // TODO: rel *and* property on the same element makes for 2 triples
-    val property = e \ "@property"
+    // step 3. [current language]
+    val lang2 = e \ "@xml:lang"
+    val lang = if (lang2.isEmpty) lang1 else lang2.text
+
     val rel = e \ "@rel"
     val rev = e \ "@rev"
-    val pred = (if (!property.isEmpty) URI(CURIE.expand(property.text, e))
-		else if (!rel.isEmpty) URI(CURIE.expand(rel.text, e))
-		else null
-	      )
-
-    val href = e \ "@href"
-    val content = e \ "@content"
-    val lang2 = e \ "@lang"
-    val lang = if (lang2.isEmpty) lang1 else lang2.text
-    val datatype = e \ "@datatype"
-    def string_term(s: String) = (
-      if (!datatype.isEmpty) data(s, URI(CURIE.expand(datatype.text, e)))
-      else if (lang != null) text(s, lang)
-      else plain(s)
-    )
-
-    val obj = (if (!href.isEmpty) URI(combine(base, href.text))
-	       else if (!content.isEmpty) string_term(content.text)
-	       else if (!property.isEmpty) string_term(e.text)
-	       else obj1
-	     )
-
-    if (pred != null && obj != null) {
-      statements.push(Holds(subj, pred, obj))
-    }
-
     val typeof = e \ "@typeof"
-    if (!typeof.isEmpty) {
-      statements.push(Holds(subj, rdf_type, URI(CURIE.expand(typeof.text, e))))
+    val (subj45, objref5, skip) = subjectObject(obj1, e, rel, rev, typeof)
+
+    // step 6. typeof
+    if (subj45 != null) {
+      for (cls <- CURIE.refN(typeof.text, e, false)) {
+	statements.push(Holds(subj45,rdf_type, cls))
+      }
     }
 
-    // TODO: propagate @href to subject, etc.
-    e.child.foreach {
-      case c: Elem => walk(c, subj, obj1, lang)
-      case _ => /* never mind stuff other than elements */
+    // step 7 rel/rev triples
+    // HTML grammar guarantees a subject at this point, I think,
+    // but in an effort to stay host-language-neutral, let's double-check
+    if (objref5 != null && subj45 != null) {
+      for (p <- CURIE.refN(rel.text, e, true))
+	statements.push(Holds(subj45, p, objref5))
+      for (p <- CURIE.refN(rev.text, e, true))
+	statements.push(Holds(objref5, p, subj45))
+    }
+
+    // step 8 incomplete triples. TODO
+    // val objref8 = if (objref5 != null) objref5 else blank.fresh()
+
+    // step 9 literal object
+    val xmlobj = (e \ "@property").text match {
+      case CURIE.parts(p, _, l) if p != null =>
+	literalObject(subj45, URI(CURIE.expand(p, l, e)), lang, e)
+      case _ => false
+    }
+
+    // step 10 complete incomplete triples. TODO
+    
+    // step 11. recur
+    if (!xmlobj) {
+      e.child.foreach {
+	case c: xml.Elem => {
+	  if (skip) walk(c, subj1, obj1, lang)
+	  else walk(c,
+		    if (subj45 != null) subj45 else subj1,
+		    (if (objref5 != null) objref5
+		     else if (subj45 != null) subj45
+		     else subj1),
+		    lang)
+	}
+	case _ => /* never mind stuff other than elements */
+      }
     }
   }
 
+  /**
+   * steps 4 and 5, refactored
+   * @return: new subject, new object ref, skip flag
+   */
+  def subjectObject(obj1: Term, e: xml.Elem,
+		    rel: xml.NodeSeq, rev: xml.NodeSeq,
+		    typeof: xml.NodeSeq
+		  ): (Term, Term, Boolean) = {
+    val about = e \ "@about"
+    lazy val src = e \ "@src"
+    lazy val resource = e \ "@resource"
+    lazy val href = e \ "@href"
+
+    val norel = rev.isEmpty && rel.isEmpty
+
+    val subj45x = {
+      if (!about.isEmpty) CURIE.ref1(about.text, e, base)
+      else if (!src.isEmpty) URI(combine(base, src.text))
+      else if (norel && !resource.isEmpty) CURIE.ref1(resource.text, e, base)
+      else if (norel && !href.isEmpty) URI(combine(base, href.text))
+      // hmm... host language creeping in here...
+      else if (e.label == "head" || e.label == "body") URI(combine(base, ""))
+      else if (!typeof.isEmpty) blank.fresh()
+      else null
+    }
+
+    val objref5 = (if (!resource.isEmpty) CURIE.ref1(resource.text, e, base)
+		   else if (!href.isEmpty) URI(combine(base, href.text))
+		   else null
+		 )
+
+    val subj45 = if (subj45x != null) subj45x else obj1
+    val skip = norel && (subj45x == null)
+
+    return (subj45, objref5, skip)
+  }
+
+  /**
+   * step 9 literal object
+   * side effect: pushes statements
+   * @return: true iff object is XMLLiteral
+   */
+  def literalObject(subj: Term, pred: URI, lang: String, e: xml.Elem
+		  ): Boolean = {
+    val content = e \ "@content"
+    val datatype = e \ "@datatype"
+
+    lazy val lex = if(!content.isEmpty) content.text else e.text
+
+    def txt(s: String) = if (lang == null) plain(s) else text(s, lang)
+
+    lazy val alltext = e.child.forall {
+      case t: xml.Text => true; case _ => false
+    }
+
+    def sayit(obj: Term) = statements.push(Holds(subj, pred, obj))
+
+    (!datatype.isEmpty, !content.isEmpty) match {
+      case (true, _) if datatype.text == "" => {
+	statements.push(Holds(subj, pred, txt(lex)))
+	false
+      }
+
+      case (true, c) => {
+	datatype.text match {
+	  case CURIE.parts(p, _, l) if p != null => {
+	    val dt = CURIE.expand(p, l, e)
+
+	    if (dt == Vocabulary.XMLLiteral) {
+	      sayit(xmllit(e.child))
+	      true
+	    } else {
+	      sayit(data(lex, URI(dt)))
+	      false
+	    }
+	  }
+	  /* TODO: update handling of goofy datatype values based on WG
+	   * response to 3 Feb comment. */
+	  case _ => false
+	}
+      }
+
+      case (_, true) => sayit(txt(content.text)); false
+      case (_, _) if alltext => sayit(txt(e.text)); false
+      case (_, _) if e.child.isEmpty => sayit(txt("")); false
+      case (_, _) => sayit(xmllit(e.child)); true
+    }
+  }
+
+
+  /**
+   * local, i.e. non-recursive processing.
+   *
+   * We'll handle the case of [skip element] set to 'false' here.
+   */
+  def local(e: xml.Elem) {
+  }
+  
 }
 
 object CURIE {
@@ -90,6 +208,8 @@ object CURIE {
 
   final val parts = new Regex("""^(?:([^:]+)?(:))?([^\]]+)$""",
 			      "prefix", "colon", "reference")
+  final val parts2 = new Regex("""^\[(?:([^:]+)?(:))?([^\]]+)\]$""",
+			       "prefix", "colon", "reference")
 
   /**
    * expand one safe curie or URI reference
@@ -104,28 +224,60 @@ object CURIE {
    * res0: URI = BlankNode(abc, None)
    * 
    */
-  def ref1(ref: String, e: Elem, base: String): Term = {
-    if (ref.startsWith("[") && ref.endsWith("]")) {
-      if (ref.startsWith("[_:")) {
-	BlankNode(ref.substring(3, ref.length - 1), None)
-      } else URI(expand(ref.substring(1, ref.length -1), e))
-    } else URI(combine(base, ref))
+  def ref1(ref: String, e: xml.Elem, base: String): Term = ref match {
+    case parts2(p, _, l) if p == "_" => BlankNode(l, None)
+    case parts2(p, _, l) if p != null => URI(expand(p, l, e))
+    case _ => URI(combine(base, ref))
   }
 
-  def expand(curie: String, e: Elem): String = {
-    curie match {
-      case parts(p, c, l) => {
-	val ns = e.getNamespace(p)
-	if (ns == null) {
-	  // TODO: find out if we're supposed to ignore this error.
-	  throw new NotDefinedError("no such prefix " + p + " on element " + e)
-	}
-	ns + l
-      }
-      case _ => {
-	assert(false, "not a curie: " + curie + " in " + e)
-	""
-      }
+  // 9.3. @rel/@rev attribute values
+  def reserved = Array("alternate",
+		       "appendix",
+		       "bookmark",
+		       "cite",
+		       "chapter",
+		       "contents",
+		       "copyright",
+		       "first",
+		       "glossary",
+		       "help",
+		       "icon",
+		       "index",
+		       "last",
+		       "license",
+		       "meta",
+		       "next",
+		       "p3pv1",
+		       "prev",
+		       "role",
+		       "section",
+		       "stylesheet",
+		       "subsection",
+		       "start",
+		       "top",
+		       "up")
+  val xhv = "http://www.w3.org/1999/xhtml/vocab#"
+
+  def refN(curies: String, e: xml.Elem, bare: Boolean): Iterable[URI] = {
+    for {
+      CURIE.parts(p, _, l) <- "\\s+".r.split(curies)
+      if l != null
+      iqual = if (p != null) CURIE.expand(p, l, e) else null
+      i = (if (iqual != null) iqual
+	   else if (bare && reserved.contains(l)) xhv + l else null
+	 )
+      if i != null
+    } yield URI(i)
+  }
+
+  def expand(p: String, l: String, e: xml.Elem): String = {
+    assert(p != null)
+
+    val ns = e.getNamespace(p)
+    if (ns == null) {
+      // TODO: find out if we're supposed to ignore this error.
+      throw new NotDefinedError("no such prefix " + p + " on element " + e)
     }
+    ns + l
   }
 }

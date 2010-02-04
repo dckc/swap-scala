@@ -75,10 +75,10 @@ case class Atom(val x: Any) extends SExp {
 	 str + /* @@TODO: escaping */
 	 "\"")
       }
-      case i: Int => i.toString()
-      /* TODO: print decimals as (/ num denom) */
 
-      case _ => throw new Exception("@@huh? what's that?" + x.toString())
+      /* TODO: something reasonable with XML */
+      /* TODO: print decimals as (/ num denom) */
+      case _ => x.toString()
     }
   }
 
