@@ -2,7 +2,7 @@ package org.w3.swap.test
 
 import org.w3.swap
 import swap.logic.{Formula, Exists, And, Atomic, Term, Literal}
-import swap.rdf.{URI, BlankNode, Graph}
+import swap.rdf.{URI, BlankNode, Graph, Holds}
 
 abstract class Namespace(n: String) {
   protected def term(name: String): URI = {
@@ -237,10 +237,10 @@ object Runner {
 
     for ((test, desc, result) <- results) {
       println()
-      println ("=== ")
+      println("" + result + desc)
+      println("" + test)
       println()
-      println("" + result + test)
-      println(desc)
+      println ("=== ")
     }
   }
 }
@@ -307,7 +307,9 @@ object WebData {
 	// TODO: throw exception
 	println("SPARQL @@parse failure:")
 	println(failure)
-	And(Nil)
+	And(List(Holds(URI("data:sparql"),
+		       URI("data:parse"),
+		       URI("data:failed") )))
       }
     }
   }
