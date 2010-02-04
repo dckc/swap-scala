@@ -38,7 +38,7 @@ class RDFaParser(base: String) {
     val about = e \ "@about"
     // TODO: subj can come from @src, @resource, @href
     val subj = (if (about.isEmpty) subj1
-		else URI(CURIE.ref1(about.text, e, base))
+		else CURIE.ref1(about.text, e, base)
 	      )
 
       // TODO: rel *and* property on the same element makes for 2 triples
@@ -88,28 +88,42 @@ class RDFaParser(base: String) {
 object CURIE {
   import scala.util.matching.Regex
 
-  final val parts = new Regex("""\[?([^:]+):([^\]]+)\]?$""",
-			      "prefix", "localname")
+  final val parts = new Regex("""^(?:([^:]+)?(:))?([^\]]+)$""",
+			      "prefix", "colon", "reference")
 
   /**
    * expand one safe curie or URI reference
+   *
+   * scala> ref1("abc", e, "data:")
+   * res0: URI = URI("data:abc")
+   * 
+   * scala> ref1("[abc:def]", e, "data:")
+   * res0: URI = URI("http://example/abc#def")
+   *
+   * scala> ref1("[_:abc]", e, "data:")
+   * res0: URI = BlankNode(abc, None)
+   * 
    */
-  def ref1(ref: String, e: Elem, base: String): String = {
-    if (ref.startsWith("[")) expand(ref, e)
-    else combine(base, ref)
+  def ref1(ref: String, e: Elem, base: String): Term = {
+    if (ref.startsWith("[") && ref.endsWith("]")) {
+      if (ref.startsWith("[_:")) {
+	BlankNode(ref.substring(3, ref.length - 1), None)
+      } else URI(expand(ref.substring(1, ref.length -1), e))
+    } else URI(combine(base, ref))
   }
 
   def expand(curie: String, e: Elem): String = {
     curie match {
-      case parts(p, l) => {
+      case parts(p, c, l) => {
 	val ns = e.getNamespace(p)
 	if (ns == null) {
+	  // TODO: find out if we're supposed to ignore this error.
 	  throw new NotDefinedError("no such prefix " + p + " on element " + e)
 	}
 	ns + l
       }
       case _ => {
-	assert(false, "not a curie: " + curie)
+	assert(false, "not a curie: " + curie + " in " + e)
 	""
       }
     }
