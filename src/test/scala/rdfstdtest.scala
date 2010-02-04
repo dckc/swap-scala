@@ -187,8 +187,8 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 	    val pattern = WebData.loadSPARQL(outaddr.i)
 
 	    println("@@rdfa parser vs sparqlq")
-	    println(data)
-	    println(pattern)
+	    println(data.quote().pretty())
+	    println(pattern.quote().pretty())
 	    val result = entails(data, pattern)
 
 	    (test, titlestr, RunResult(result))
@@ -212,8 +212,8 @@ class RDFaExample(indoc: String, outdoc: String) {
     val result = entails(actual, expected) && entails(expected, actual)
 
     if(!result) {
-      println("expected: " + expected)
-      println("actual: " + actual)
+      println("expected: " + expected.quote().pretty())
+      println("actual: " + actual.quote().pretty())
     }
 
     Stream.cons((aTest, indoc, RunResult(result)),

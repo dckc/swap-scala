@@ -2,6 +2,19 @@ package org.w3.swap.sexp
 
 import java.io.Writer
 
+/*
+ * scala docs say:
+ *   based on Lindig's strict version of Wadler's adaptation of
+ *   Hughes' pretty-printer.
+ * found it:
+ *   Strictly Pretty (2000)
+ *   by Christian Lindig ,  Gartner Datensysteme
+ *   http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.34.2200
+ *   formerly at:
+ *   http://www.gaertner.de/~lindig/papers/download/strictly-pretty.ps.gz
+ */
+import scala.text.{Document, DocText, DocGroup, DocCons, DocNest}
+
 sealed abstract class SExp {
   def print(): String = {
     val b = new java.io.StringWriter()
@@ -9,11 +22,21 @@ sealed abstract class SExp {
     b.toString()
   }
 
+  def pretty(): String = {
+    val w = new java.io.StringWriter()
+    doc.format(72, w)
+    w.toString()
+  }
+
+  def doc: Document
+
   def writeTo(w: Writer)
 }
 
 case class Cons(head: SExp, tail: SExp) extends SExp {
-  import SExp.writeTail
+  import SExp.{writeTail, docTail}
+
+  override def doc = DocGroup("(" :: DocNest(2, head.doc :/: docTail(tail)))
 
   override def writeTo(w: Writer) {
 
@@ -40,23 +63,28 @@ case class Cons(head: SExp, tail: SExp) extends SExp {
 }
 
 case class Atom(val x: Any) extends SExp {
-  override def writeTo(w: Writer) {
+
+  override def toString(): String = {
     x match {
       /* lisp syntax, not scala syntax.
        * Well... close, anyway... lowercase symbols
        * and such should print as |foo|. */
-      case s: Symbol => w.append(s.name)
+      case s: Symbol => s.name
       case str: String => {
-	w.append("\"")
-	w.append(str) /* @@TODO: escaping */
-	w.append("\"")
+	("\"" +
+	 str + /* @@TODO: escaping */
+	 "\"")
       }
-      case i: Int => w.append(i.toString())
+      case i: Int => i.toString()
       /* TODO: print decimals as (/ num denom) */
 
       case _ => throw new Exception("@@huh? what's that?" + x.toString())
     }
   }
+
+  override def doc = DocText(this.toString())
+
+  override def writeTo(w: Writer) = w.append(this.toString())
 }
 
 object SExp {
@@ -75,6 +103,14 @@ object SExp {
   }
 
   implicit def fromSymbol(s: Symbol): SExp = Atom(s)
+
+  def docTail(e: SExp): Document = {
+    e match {
+      case Cons(h, t) => h.doc :/: docTail(t)
+      case NIL => DocText(")")
+      case _ => DocText(".") :/: e.doc
+    }
+  }
 
   /* scalaQ: private? */
   def writeTail(e: SExp, w: Writer) {
