@@ -23,7 +23,7 @@ class RDFaParser(base: String) {
   val blank = BlankNode("node", None) // source of fresh variables
 
   def parse(e: xml.Elem): Formula = {
-    walk(e, URI(base), null, null)
+    walk(e, URI(base), null, List(), List(), null)
 
     val f1 = And(statements.toList.reverse)
     val vars = f1.variables()
@@ -39,19 +39,25 @@ class RDFaParser(base: String) {
    *
    * @param subj1: [parent subject] from step 1
    * @param obj1: [parent object] from step 1
+   * @param pending1f: propertys of [list of incomplete triples]
+   *                   from evaluation context, forward direction
+   * @param pending1r: propertys of [list of incomplete triples]
+   *                   from evaluation context, reverse direction
    * @param lang1: [language] from step 1
    *
-   * TODO: incomplete triples
    */
-  def walk(e: xml.Elem, subj1: Term, obj1: Term, lang1: String) {
+  def walk(e: xml.Elem, subj1: Term, obj1: Term,
+	   pending1f: Iterable[Term], pending1r: Iterable[Term],
+	   lang1: String) {
     assert(subj1 != null) // with NotNull doesn't seem to work. scalaq?
 
     // step 2., URI mappings, is taken care of by scala.xml
 
     // step 3. [current language]
-    val lang2 = e \ "@xml:lang"
+    val lang2 = e \ "@{http://www.w3.org/XML/1998/namespace}lang"
     val lang = if (lang2.isEmpty) lang1 else lang2.text
 
+    // steps 4 and 5, refactored
     val rel = e \ "@rel"
     val rev = e \ "@rev"
     val typeof = e \ "@typeof"
@@ -60,22 +66,27 @@ class RDFaParser(base: String) {
     // step 6. typeof
     if (subj45 != null) {
       for (cls <- CURIE.refN(typeof.text, e, false)) {
-	statements.push(Holds(subj45,rdf_type, cls))
+	statements.push(Holds(subj45, rdf_type, cls))
       }
     }
 
     // step 7 rel/rev triples
     // HTML grammar guarantees a subject at this point, I think,
     // but in an effort to stay host-language-neutral, let's double-check
+    val relterms = CURIE.refN(rel.text, e, true)
+    val revterms = CURIE.refN(rev.text, e, true)
     if (objref5 != null && subj45 != null) {
-      for (p <- CURIE.refN(rel.text, e, true))
+      for (p <- relterms)
 	statements.push(Holds(subj45, p, objref5))
-      for (p <- CURIE.refN(rev.text, e, true))
+      for (p <- revterms)
 	statements.push(Holds(objref5, p, subj45))
     }
 
-    // step 8 incomplete triples. TODO
-    // val objref8 = if (objref5 != null) objref5 else blank.fresh()
+    // step 8 incomplete triples.
+    val (objref8, pending8f, pending8r) = (
+      if (objref5 == null && (!relterms.isEmpty || !revterms.isEmpty))
+	(blank.fresh(), relterms, revterms)
+      else (objref5, List(), List()) )
 
     // step 9 literal object
     val xmlobj = (e \ "@property").text match {
@@ -84,19 +95,23 @@ class RDFaParser(base: String) {
       case _ => false
     }
 
-    // step 10 complete incomplete triples. TODO
-    
+    // step 10 complete incomplete triples.
+    if (!skip && subj45 != null) {
+      for(p <- pending1f) statements.push(Holds(subj1, p, subj45))
+      for(p <- pending1r) statements.push(Holds(subj45, p, subj1))
+    }
+
     // step 11. recur
     if (!xmlobj) {
       e.child.foreach {
 	case c: xml.Elem => {
-	  if (skip) walk(c, subj1, obj1, lang)
+	  if (skip) walk(c, subj1, obj1, pending8f, pending8r, lang)
 	  else walk(c,
 		    if (subj45 != null) subj45 else subj1,
-		    (if (objref5 != null) objref5
+		    (if (objref8 != null) objref8
 		     else if (subj45 != null) subj45
 		     else subj1),
-		    lang)
+		    pending8f, pending8r, lang)
 	}
 	case _ => /* never mind stuff other than elements */
       }
@@ -166,7 +181,7 @@ class RDFaParser(base: String) {
 	false
       }
 
-      case (true, c) => {
+      case (true, _) => {
 	datatype.text match {
 	  case CURIE.parts(p, _, l) if p != null => {
 	    val dt = CURIE.expand(p, l, e)
