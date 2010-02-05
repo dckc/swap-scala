@@ -25,7 +25,8 @@ object N3Tool {
       val result = parser.parseAll(parser.document, reader)
 
       result match {
-	case parser.Success(f, _ ) => println(f.quote().print())
+	// TODO: should use a Writer rather than buffering in memory
+	case parser.Success(f, _ ) => println(f.quote().pretty())
 	case parser.Failure(x, y) => {
 	  println("N3Parser failure:")
 	  println(x)
@@ -52,8 +53,11 @@ object N3Tool {
     import org.w3.swap.rdf.RDFXMLParser
 
     val e = XML.load(addr)
-    val p = new RDFXMLParser(addr) // @@TODO: absolutize base
-    println(p.parse(e).quote().print())
+    // TODO: move WebData out of swap.test so we can use asURI here.
+    val p = new RDFXMLParser(addr)
+    val g = new rdf.Graph(p.parse(e))
+    val e2 = rdf.RDFXMLout.asxml(g)
+    println(e2)
   }
 }
 

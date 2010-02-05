@@ -189,6 +189,7 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 	    if (pattern == null) {
 	      (test, titlestr, UnsupportedFeature("SPARQL parse failure"))
 	    } else {
+	      // TODO: handle expectedResults false
 	      val result = entails(data, pattern)
 	      if (!result) {
 		println()

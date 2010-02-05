@@ -89,6 +89,7 @@ class RDFaParser(base: String) {
       else (objref5, List(), List()) )
 
     // step 9 literal object
+      // TODO: fix to handle tc54 with property="dc:creator dc:publisher"
     val xmlobj = (e \ "@property").text match {
       case CURIE.parts(p, _, l) if p != null =>
 	literalObject(subj45, URI(CURIE.expand(p, l, e)), lang, e)
