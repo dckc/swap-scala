@@ -1,0 +1,18 @@
+<!--
+    cribbed from
+    http://code.google.com/appengine/docs/java/gettingstarted/creating.html
+-->
+
+<web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5">
+    <servlet>
+        <servlet-name>swaptool</servlet-name>
+        <servlet-class>org.w3.swap.webapp.HelloWorld</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>swaptool</servlet-name>
+        <url-pattern>/</url-pattern>
+    </servlet-mapping>
+    <welcome-file-list>
+        <welcome-file>/index.html</welcome-file>
+    </welcome-file-list>
+</web-app>

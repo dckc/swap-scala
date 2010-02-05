@@ -4,9 +4,9 @@
  * http://www.scalatest.org/
  * http://code.google.com/p/simple-build-tool/wiki/BuildConfiguration
  */
-import sbt.{ProjectInfo, DefaultProject}
+import sbt.{ProjectInfo, DefaultProject, DefaultWebProject}
 
-class TestingProject(info: ProjectInfo) extends DefaultProject(info)
+class TestingProject(info: ProjectInfo) extends DefaultWebProject(info)
 {
   /* per SethTisue in #scala */
   override def compileOptions =
@@ -38,4 +38,11 @@ class TestingProject(info: ProjectInfo) extends DefaultProject(info)
   val scalacheck = "org.scala-tools.testing" % "scalacheck_2.8.0.Beta1-RC5" % "1.7-SNAPSHOT" % "test"
   val toolsrep = "Scala-Tools Repo" at "http://www.scala-tools.org/repo-releases"
   val bleedingedge = "Scala-Tools testing" at "http://www.scala-tools.org/repo-snapshots/"
+
+
+  // per http://code.google.com/p/simple-build-tool/wiki/WebApplications
+  // and http://code.google.com/p/simple-build-tool/wiki/WebApplicationExample
+
+  val jetty6 = "org.mortbay.jetty" % "jetty" % "6.1.14" % "test"
+  val servlet = "javax.servlet" % "servlet-api" % "2.5" % "provided"
 }
