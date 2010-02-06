@@ -51,7 +51,7 @@ object RDFXMLout{
 
 	  case Apply('text,
 		     List(Literal(s: String), Literal(code: Symbol) )) =>
-	    Elem("ns0", ln, attr1("xml", "lang", "" + code), pns, xml.Text(s))
+	    Elem("ns0", ln, attr1("xml", "lang", code.name), pns, xml.Text(s))
 
 	  case Apply('data, List(URI(dt), Literal(s: String) )) =>
 	    Elem("ns0", ln, attr1("rdf", "datatype", dt), pns, xml.Text(s))
