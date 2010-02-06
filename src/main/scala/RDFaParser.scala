@@ -58,23 +58,22 @@ class RDFaParser(base: String) {
     val lang = if (lang2.isEmpty) lang1 else Symbol(lang2.text.toLowerCase)
 
     // steps 4 and 5, refactored
-    val rel = e \ "@rel"
-    val rev = e \ "@rev"
-    val typeof = e \ "@typeof"
-    val (subj45, objref5, skip) = subjectObject(obj1, e, rel, rev, typeof)
+    val relterms = CURIE.refN((e \ "@rel").text, e, true)
+    val revterms = CURIE.refN((e \ "@rev").text, e, true)
+    val types = CURIE.refN((e \ "@typeof").text, e, false)
+    val props = CURIE.refN((e \ "@property").text, e, false)
+    val (subj45, objref5, skip) = subjectObject(obj1, e,
+						relterms.isEmpty &&
+						revterms.isEmpty,
+						types, props)
 
     // step 6. typeof
-    if (subj45 != null) {
-      for (cls <- CURIE.refN(typeof.text, e, false)) {
-	statements.push(Holds(subj45, rdf_type, cls))
-      }
-    }
+    if (subj45 != null)
+      for (cls <- types) statements.push(Holds(subj45, rdf_type, cls))
 
     // step 7 rel/rev triples
     // HTML grammar guarantees a subject at this point, I think,
     // but in an effort to stay host-language-neutral, let's double-check
-    val relterms = CURIE.refN(rel.text, e, true)
-    val revterms = CURIE.refN(rev.text, e, true)
     if (objref5 != null && subj45 != null) {
       for (p <- relterms)
 	statements.push(Holds(subj45, p, objref5))
@@ -84,17 +83,13 @@ class RDFaParser(base: String) {
 
     // step 8 incomplete triples.
     val (objref8, pending8f, pending8r) = (
-      if (objref5 == null && (!relterms.isEmpty || !revterms.isEmpty))
+      if (objref5 == null && !(relterms.isEmpty && revterms.isEmpty))
 	(blank.fresh(), relterms, revterms)
       else (objref5, List(), List()) )
 
     // step 9 literal object
-      // TODO: fix to handle tc54 with property="dc:creator dc:publisher"
-    val xmlobj = (e \ "@property").text match {
-      case CURIE.parts(p, _, l) if p != null =>
-	literalObject(subj45, URI(CURIE.expand(p, l, e)), lang, e)
-      case _ => false
-    }
+    val xmlobj = if (!props.isEmpty) literalObject(subj45, props, lang, e)
+		 else false
 
     // step 10 complete incomplete triples.
     if (!skip && subj45 != null) {
@@ -124,15 +119,13 @@ class RDFaParser(base: String) {
    * @return: new subject, new object ref, skip flag
    */
   def subjectObject(obj1: Term, e: xml.Elem,
-		    rel: xml.NodeSeq, rev: xml.NodeSeq,
-		    typeof: xml.NodeSeq
+		    norel: Boolean,
+		    types: Iterable[URI], props: Iterable[URI]
 		  ): (Term, Term, Boolean) = {
     val about = e \ "@about"
     lazy val src = e \ "@src"
     lazy val resource = e \ "@resource"
     lazy val href = e \ "@href"
-
-    val norel = rev.isEmpty && rel.isEmpty
 
     val subj45x = {
       if (!about.isEmpty) CURIE.ref1(about.text, e, base)
@@ -141,7 +134,7 @@ class RDFaParser(base: String) {
       else if (norel && !href.isEmpty) URI(combine(base, href.text))
       // hmm... host language creeping in here...
       else if (e.label == "head" || e.label == "body") URI(combine(base, ""))
-      else if (!typeof.isEmpty) blank.fresh()
+      else if (!types.isEmpty) blank.fresh()
       else null
     }
 
@@ -151,7 +144,7 @@ class RDFaParser(base: String) {
 		 )
 
     val subj45 = if (subj45x != null) subj45x else obj1
-    val skip = norel && (subj45x == null)
+    val skip = norel && (subj45x == null) && props.isEmpty
 
     return (subj45, objref5, skip)
   }
@@ -161,8 +154,8 @@ class RDFaParser(base: String) {
    * side effect: pushes statements
    * @return: true iff object is XMLLiteral
    */
-  def literalObject(subj: Term, pred: URI, lang: Symbol, e: xml.Elem
-		  ): Boolean = {
+  def literalObject(subj: Term, props: Iterable[URI], lang: Symbol,
+		    e: xml.Elem): Boolean = {
     val content = e \ "@content"
     val datatype = e \ "@datatype"
 
@@ -174,13 +167,12 @@ class RDFaParser(base: String) {
       case t: xml.Text => true; case _ => false
     }
 
-    def sayit(obj: Term) = statements.push(Holds(subj, pred, obj))
+    def sayit(obj: Term) = {
+      for(p <- props) statements.push(Holds(subj, p, obj))
+    }
 
     (!datatype.isEmpty, !content.isEmpty) match {
-      case (true, _) if datatype.text == "" => {
-	statements.push(Holds(subj, pred, txt(lex)))
-	false
-      }
+      case (true, _) if datatype.text == "" => sayit(txt(lex)); false
 
       case (true, _) => {
 	datatype.text match {
