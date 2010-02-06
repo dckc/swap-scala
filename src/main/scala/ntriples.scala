@@ -104,7 +104,7 @@ class NTriplesStrings extends RegexParsers {
   def literal: Parser[Term] = string ~ opt("@"~language | "^^"~datatype) ^^ {
     case str ~ None => plain(str)
 
-    case str ~ Some("@" ~ lang) => text(str, lang)
+    case str ~ Some("@" ~ lang) => text(str, Symbol(lang))
 
     case lex ~ Some("^^" ~ dt) => data(lex, mkuri(dt))
   }

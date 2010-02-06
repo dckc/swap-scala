@@ -79,12 +79,12 @@ object AbstractSyntax {
   def plain(s: String): Term = Literal(s)
 
   /**
-   * @param code a language code; gets normalized to lower case in the term.
+   * @param code a language code; must be lower case
    */
-  def text(s: String, code: String): Term = {
-    Apply('text,
-	  List(Literal(code.toLowerCase),
-	       Literal(s)))
+  def text(s: String, code: Symbol): Term = {
+    assert({val c = code.toString(); c == c.toLowerCase})
+
+    Apply('text, List(Literal(s), Literal(code)) )
   }
   def data(lex: String, dt: URI): Term = Apply('data, List(dt, Literal(lex)))
   def xml(x: NodeSeq): Term = Apply('xml, List(Literal(x)))
@@ -98,15 +98,13 @@ object AbstractSyntax {
 
       /* TODO detail: lang code syntax */
       case Apply('text, List(Literal(s: String),
-			     Literal(code: String) )) => {
-			       // code must be in canonical case
-			       code == code.toLowerCase
-			     }
+			     Literal(code: Symbol) )) => true
       case Apply('data, List(URI(_),
 			     Literal(s: String) )) => true
       case Apply('xml, List(Literal(e: NodeSeq))) => true
 
       case Apply(_, Nil) => true // @@allow skolem terms, for now...
+
       case _ => if (die) throw new Exception("bad term: " + t) else false
     }
   }

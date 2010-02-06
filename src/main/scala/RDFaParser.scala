@@ -48,14 +48,14 @@ class RDFaParser(base: String) {
    */
   def walk(e: xml.Elem, subj1: Term, obj1: Term,
 	   pending1f: Iterable[Term], pending1r: Iterable[Term],
-	   lang1: String) {
+	   lang1: Symbol) {
     assert(subj1 != null) // with NotNull doesn't seem to work. scalaq?
 
     // step 2., URI mappings, is taken care of by scala.xml
 
     // step 3. [current language]
     val lang2 = e \ "@{http://www.w3.org/XML/1998/namespace}lang"
-    val lang = if (lang2.isEmpty) lang1 else lang2.text
+    val lang = if (lang2.isEmpty) lang1 else Symbol(lang2.text.toLowerCase)
 
     // steps 4 and 5, refactored
     val rel = e \ "@rel"
@@ -161,7 +161,7 @@ class RDFaParser(base: String) {
    * side effect: pushes statements
    * @return: true iff object is XMLLiteral
    */
-  def literalObject(subj: Term, pred: URI, lang: String, e: xml.Elem
+  def literalObject(subj: Term, pred: URI, lang: Symbol, e: xml.Elem
 		  ): Boolean = {
     val content = e \ "@content"
     val datatype = e \ "@datatype"

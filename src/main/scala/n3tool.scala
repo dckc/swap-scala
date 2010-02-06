@@ -1,13 +1,17 @@
 package org.w3.swap
-import org.w3.swap.n3.N3Parser
-import org.w3.swap.rdf.RDFXMLParser
 
 import java.io.{FileReader, FileNotFoundException}
+
+import org.w3.swap
+import swap.n3.N3Parser
+import swap.rdf.RDFXMLParser
 
 object N3Tool {
   def main(args: Array[String]): Unit = {
     if (args.length >= 2 && args(0) == "--rdf"){
       readRDF(args(1))
+    } else if (args.length >= 2 && args(0) == "--rdfa"){
+      readRDFa(args(1))
     } else if (args.length == 1) {
       readN3(args(0))
     } else {
@@ -49,13 +53,17 @@ object N3Tool {
   }
 
   def readRDF(addr: String) {
-    import scala.xml.XML
-    import org.w3.swap.rdf.RDFXMLParser
+    // TODO: stream triples as they come using a callback/Stream/etc.
+    val f = WebData.loadRDFXML(WebData.asURI(addr))
+    val g = new rdf.Graph(f)
+    val e2 = rdf.RDFXMLout.asxml(g)
+    println(e2)
+  }
 
-    val e = XML.load(addr)
-    // TODO: move WebData out of swap.test so we can use asURI here.
-    val p = new RDFXMLParser(addr)
-    val g = new rdf.Graph(p.parse(e))
+  def readRDFa(addr: String) {
+    // TODO: stream triples as they come using a callback/Stream/etc.
+    val f = WebData.loadRDFa(WebData.asURI(addr))
+    val g = new rdf.Graph(f)
     val e2 = rdf.RDFXMLout.asxml(g)
     println(e2)
   }

@@ -29,17 +29,42 @@ class HelloWorld extends HttpServlet {
 }
 
 class RDFaExtractor extends HttpServlet {
+
+  /**
+   * This provides a scala analog to python's try/except/else
+   */
+  private def maybe[A](a: => A) = try { Right(a) } catch { case e => Left(e) }
+
   override def doGet(request: HttpServletRequest,
 		     response: HttpServletResponse) {
     val addr = request.getParameter("addr")
-    
-    val e = XML.load(addr)
-    // TODO: move WebData out of swap.test so we can use asURI here.
-    val p = new swap.rdf.RDFaParser(addr)
-    val g = new swap.rdf.Graph(p.parse(e))
-    val e2 = swap.rdf.RDFXMLout.asxml(g)
 
-    response.setContentType("application/rdf+xml")
-    response.getWriter.println("" + e2)
+    if (addr.startsWith("http://")){
+      maybe { XML.load(addr) } match {
+	case Right(doc) => {
+	  val p = new swap.rdf.RDFaParser(addr)
+	  val g = new swap.rdf.Graph(p.parse(doc))
+	  val e2 = swap.rdf.RDFXMLout.asxml(g)
+	
+	  response.setContentType("application/rdf+xml")
+	  response.getWriter.println("" + e2)
+	}
+	case Left(e: java.lang.IllegalArgumentException) =>
+	  response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+			     "bad address? " + addr)
+	case Left(e: java.io.IOException) =>
+	  response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+			     "trouble loading from " + addr)
+
+	case Left(e: org.xml.sax.SAXParseException) =>
+	  response.sendError(HttpServletResponse.SC_BAD_REQUEST,
+			     "XML syntax error")
+
+	case Left(e) => throw e
+      }
+    } else {
+      response.sendError(HttpServletResponse.SC_FORBIDDEN,
+			 "try an absolute HTTP URI")
+    }
   }
 }

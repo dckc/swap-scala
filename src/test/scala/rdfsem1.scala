@@ -35,7 +35,7 @@ object ent extends Properties("RDF 2004 Entailment") {
 
   val genLiteral = Gen.oneOf(plain("abc"),
 			     data("2006-01-01", URI("<data:#date>")), 
-			     text("chat", "fr") )
+			     text("chat", 'fr) )
 
   val genSPO = for {
     s <- Gen.oneOf(genVar, genURI)

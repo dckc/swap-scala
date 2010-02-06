@@ -79,10 +79,10 @@ object WebData {
   }
 
   /**
-   * Convert a (local) file path to a URI.
+   * Absolutize a URI reference w.r.t. cwd.
    */
-  def asURI(fp: String): String = {
+  def asURI(ref: String): String = {
     val cwd = java.lang.System.getProperty("user.dir")
-    new java.io.File(cwd, fp).toURI().toString()
+    new java.io.File(cwd).toURI().resolve(ref).toString()
   }
 }

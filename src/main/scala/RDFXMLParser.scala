@@ -97,7 +97,7 @@ class RDFXMLParser(base: String) {
 	  case ("", 0) if !nid.isEmpty => BlankNode(nid.text, None)
 	  case ("", 0) if !dt.isEmpty =>
 	    data(e.text, URI(combine(base, dt.text)))
-	  case ("", 0) if !lang.isEmpty => text(e.text, lang.text)
+	  case ("", 0) if !lang.isEmpty => text(e.text, Symbol(lang.text))
 	  case ("", 0) => plain(e.text)
 	  case _ => 
 	    throw new Exception("@@bad object syntax")

@@ -310,7 +310,8 @@ abstract class TextRDF(val baseURI: String) extends N3Lex {
     // TODO: can langString and datatypeString use """s too?
     // TODO: left factor string-handling.
     string ~ "^^" ~ symbol ^^ { case lex~_~dt => data(lex, dt) }
-    | string ~ "@" ~ language ^^ { case s~_~lang => text(s, lang) }
+    | string ~ "@" ~ language ^^ {
+      case s~_~lang => text(s, Symbol(lang.toLowerCase)) }
     | string ^^ { case s => Literal(s) }
     | stringLit3 ^^ { case s => Literal(s) }
     | numeral
