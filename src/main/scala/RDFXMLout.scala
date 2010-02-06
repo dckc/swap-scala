@@ -16,6 +16,7 @@ object RDFXMLout{
   }
 
   // TODO: real character classes for namestartchar, namechar
+  // TODO: ".../mbox_sha1sum" => (".../mbox_sha1", "sum")
   final val splitter = "(.*[^a-zA-Z])([a-zA-Z][a-zA-Z0-9_-]*)".r
 
   def asxml(arc: Holds): Elem = {
@@ -57,7 +58,8 @@ object RDFXMLout{
 	    Elem("ns0", ln, attr1("rdf", "datatype", dt), pns, xml.Text(s))
 
 	  case Apply('xml, List(Literal(e: xml.NodeSeq))) =>
-	    Elem("ns0", ln, xml.Null, pns, new xml.Group(e))
+	    Elem("ns0", ln, attr1("rdf", "parseType", "Literal"),
+		 pns, new xml.Group(e))
 
 	  case _ => throw new Exception("object not well formed" + arc.o)
 	}
