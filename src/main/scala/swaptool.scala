@@ -35,7 +35,7 @@ class RDFaExtractor extends HttpServlet {
     
     val e = XML.load(addr)
     // TODO: move WebData out of swap.test so we can use asURI here.
-    val p = new swap.rdf.RDFXMLParser(addr)
+    val p = new swap.rdf.RDFaParser(addr)
     val g = new swap.rdf.Graph(p.parse(e))
     val e2 = swap.rdf.RDFXMLout.asxml(g)
 
