@@ -57,7 +57,11 @@ object RDFaSyntax{
 
     // step 3. [current language]
     val lang2 = e \ "@{http://www.w3.org/XML/1998/namespace}lang"
-    val lang = if (lang2.isEmpty) lang1 else Symbol(lang2.text.toLowerCase)
+    val lang = {
+      if (lang2.isEmpty) lang1
+      else if (lang2.text == "") null
+      else Symbol(lang2.text.toLowerCase)
+    }
 
     // steps 4 and 5, refactored
     val relterms = CURIE.refN((e \ "@rel").text, e, true)
@@ -110,7 +114,7 @@ object RDFaSyntax{
       e.child.toStream.flatMap {
 	case c: xml.Elem => {
 	  if (skip) walk(c, base, vars, subj1, obj1,
-			 pending8f, pending8r, lang)
+			 pending1f, pending1r, lang)
 	  else walk(c, base, vars,
 		    if (subj45 != null) subj45 else subj1,
 		    (if (objref8 != null) objref8
@@ -183,11 +187,11 @@ object RDFaSyntax{
     }
 
     (!datatype.isEmpty, !content.isEmpty) match {
-      case (true, _) if datatype.text == "" => (sayit(txt(lex)), false)
+      case (true, _) if datatype.text == "" => (sayit(plain(lex)), false)
 
       case (true, _) => {
 	datatype.text match {
-	  case CURIE.parts(p, _, l) if p != null => {
+	  case CURIE.parts(p, l) => {
 	    val dt = CURIE.expand(p, l, e)
 
 	    if (dt == Vocabulary.XMLLiteral) (sayit(xmllit(e.child)), true)
@@ -211,10 +215,10 @@ object RDFaSyntax{
 object CURIE {
   import scala.util.matching.Regex
 
-  final val parts = new Regex("""^(?:([^:]+)?(:))?([^\]]+)$""",
-			      "prefix", "colon", "reference")
-  final val parts2 = new Regex("""^\[(?:([^:]+)?(:))?([^\]]+)\]$""",
-			       "prefix", "colon", "reference")
+  final val parts = new Regex("""^([^:]+)?:(.*)$""",
+			      "prefix", "reference")
+  final val parts2 = new Regex("""^\[([^:]+)?:(.*)\]$""",
+			       "prefix", "reference")
 
   /**
    * expand one safe curie or URI reference
@@ -231,8 +235,11 @@ object CURIE {
    */
   def ref1(ref: String, e: xml.Elem, base: String,
 	   vars: XMLNameScope): Term = ref match {
-    case parts2(p, _, l) if p == "_" => vars.byName(l)
-    case parts2(p, _, l) if p != null => URI(expand(p, l, e))
+    case parts2("_", "") => vars.byName("_")
+    // TODO: encode arbitrary strings as XML names
+    case parts2("_", l) if l.startsWith("_") => vars.byName(l)
+    case parts2("_", l) => vars.byName(l)
+    case parts2(p, l) => URI(expand(p, l, e))
     case _ => URI(combine(base, ref))
   }
 
@@ -266,21 +273,17 @@ object CURIE {
 
   // TODO: check whether _:xxx is allowed in, e.g., @typeof
   def refN(curies: String, e: xml.Elem, bare: Boolean): Iterable[URI] = {
-    for {
-      CURIE.parts(p, _, l) <- "\\s+".r.split(curies)
-      if l != null
-      iqual = if (p != null) CURIE.expand(p, l, e) else null
-      i = (if (iqual != null) iqual
-	   else if (bare && reserved.contains(l)) xhv + l else null
-	 )
-      if i != null
-    } yield URI(i)
+    "\\s+".r.split(curies) flatMap {
+      case CURIE.parts(p, l) => List(URI(CURIE.expand(p, l, e)))
+      case token if (bare && reserved.contains(token)) =>
+	List(URI(xhv + token))
+      case _ => List()
+    }
   }
 
   def expand(p: String, l: String, e: xml.Elem): String = {
-    assert(p != null)
+    val ns = if (p == null) xhv else e.getNamespace(p)
 
-    val ns = e.getNamespace(p)
     if (ns == null) {
       // TODO: find out if we're supposed to ignore this error.
       throw new NotDefinedError("no such prefix " + p + " on element " + e)
