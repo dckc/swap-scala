@@ -23,7 +23,7 @@ import swap.WebData
 class HelloWorld extends HttpServlet {
   override def doGet(request: HttpServletRequest,
 		     response: HttpServletResponse) {
-    response.setContentType("text/html")
+    response.setContentType("text/html; charset='utf-8'")
     response.getWriter.println("" + <p>it's <em>alive!</em></p>)
   }
 }
@@ -42,9 +42,12 @@ class RDFaExtractor extends HttpServlet {
     if (addr.startsWith("http://")){
       maybe { XML.load(addr) } match {
 	case Right(doc) => {
-	  val arcs = swap.rdf.RDFaSyntax.getArcs(doc, addr)
+	  val href = doc \ "head" \ "base" \ "@href"
+	  val base = if (href.isEmpty) addr else href.text
+
+	  val arcs = swap.rdf.RDFaSyntax.getArcs(doc, base)
 	
-	  response.setContentType("application/rdf+xml")
+	  response.setContentType("application/rdf+xml; charset='utf-8'")
 
 	  swap.rdf.RDFXMLout.writeArcsDoc(response.getWriter, arcs)
 	}
