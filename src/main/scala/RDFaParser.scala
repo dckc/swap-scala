@@ -263,16 +263,16 @@ object CURIE {
 		       "start",
 		       "top",
 		       "up")
-  val xhv = "http://www.w3.org/1999/xhtml/vocab#"
+  final val xhv = "http://www.w3.org/1999/xhtml/vocab#"
 
   // TODO: check whether _:xxx is allowed in, e.g., @typeof
   def refN(e: xml.Elem, attr: String, bare: Boolean): Iterable[URI] = {
     "\\s+".r.split((e \ attr).text) flatMap {
-      case CURIE.parts(p, l) =>
-	if (p != null) List(URI(CURIE.expand(p, l, e))) else Nil
       case token if (bare && reserved.contains(token)) =>
 	List(URI(xhv + token))
-      case _ =>	Nil
+      case CURIE.parts(p, l) =>
+	if (p != null) List(URI(CURIE.expand(p, l, e))) else Nil
+      case _ => Nil
     }
   }
 
