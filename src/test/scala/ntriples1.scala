@@ -9,28 +9,6 @@ class NTriplesMisc extends Spec with ShouldMatchers {
   import swap.logic.{And, Exists}
   import swap.ntriples.NTriplesParser
 
-  describe("NTriples blank nodes") {
-
-    it("should match by name"){
-      val vars = List(BlankNode("", Some("abc".intern())),
-		      BlankNode("", Some("<abc>".substring(1,4).intern())) )
-
-      (vars.removeDuplicates.length) should equal(1)
-    }
-  }
-
-  describe("Formula.variables()") {
-    it("should expect caller to remove dups"){
-      val v1 = BlankNode("", Some("abc".intern()))
-      val v2 = BlankNode("", Some("<abc>".substring(1,4).intern()))
-      val f = And(List(Holds(URI("data:s1"), URI("data:p"), v1),
-		       Holds(URI("data:s2"), URI("data:p"), v2) ))
-      (f.variables().toList.removeDuplicates) should equal (List(v1))
-      (f.variables().toList.removeDuplicates) should equal (
-	List(v1, v2).removeDuplicates)
-    }
-  }
-
   describe("NTriples parser") {
       val doc = """#
 <data:bob> <data:home> _:somewhere .

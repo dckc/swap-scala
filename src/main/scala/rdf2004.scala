@@ -5,7 +5,7 @@ import scala.collection.immutable.ListSet
 import org.w3.swap
 import swap.logic.{Formula, Atomic, And, Exists,
 		   Term, Variable,
-		   Application, Apply, Literal,
+		   FunctionTerm, Apply, Literal,
 		   AbstractSyntax => Logic, ConjunctiveKB }
 import swap.sexp.Cons
 import swap.sexp.SExp.fromSeq
@@ -16,7 +16,7 @@ import swap.sexp.SExp.fromSeq
  * @param p a URI
  * @param o a URI, BlankNode, or Literal from plain(), text(), data(), or xml()
  * 
- * TODO: move much of its structure up to Atomic a la Application
+ * TODO: move much of its structure up to Atomic a la FunctionTerm
  */
 case class Holds(s: Term, p: Term, o: Term) extends Atomic {
   require(s match { case BlankNode(_, _) | URI(_) => true; case _ => false } )
@@ -34,7 +34,7 @@ case class Holds(s: Term, p: Term, o: Term) extends Atomic {
 /**
  * Logical constants (i.e. 0-ary function terms) of RDF.
  */
-case class URI(val i: String) extends Application {
+case class URI(val i: String) extends FunctionTerm {
   /* ISSUE: not every string makes a URI */
   /* ISSUE: actually closer to IRI; called RDFuri or something
    * in the spec */
@@ -46,26 +46,50 @@ case class URI(val i: String) extends Application {
 
 /**
  * Logical variables of RDF.
+ * @param n: an XML name. TODO: assert this
  */
-case class BlankNode(val n: String, val qual: Option[Any]) extends Variable {
-  override def quote() = name
+case class BlankNode(val n: String, val qual: Option[Int]) extends Variable {
+  override def quote() = sym
 
-  lazy val name = qual match {
+  lazy val sym = qual match {
     case None => Symbol(n)
-    case Some(x) => Symbol(n + "." + x.toString())
+    case Some(x) => Symbol(n + "." + x)
   }
-
-  override def fresh() = BlankNode(n, Some(new Thing()))
-}
-object Counter {
-  protected var cur = 0
-  def next(): Int = { cur += 1; cur }
-}
-class Thing {
-  private val id = Counter.next()
-  override def toString = id.toString()
 }
 
+class XMLNameScope(override val vars: Iterable[Variable])
+extends swap.logic.Scope(vars) {
+  def this() = this(List())
+
+  import scala.collection.mutable
+  val varstack = new mutable.Stack[Variable]
+  varstack.pushAll(vars)
+
+  /**
+   * @param suggestedName: an XML name
+   * @return an XML name unique to this scope
+   */
+  override def fresh(suggestedName: String): BlankNode = {
+    assert(suggestedName.length > 0)
+
+    /* baseName is a name that does *not* follow the xyx.123 pattern */
+    val baseName = {
+      val lastChar = suggestedName.substring(suggestedName.length-1)
+      if("0123456789".contains(lastChar) &&
+	 suggestedName.contains('.')) suggestedName + "_"
+      else suggestedName
+    }
+
+    val b = {
+      val seen = varstack.exists { v => v.quote().toString() == baseName }
+      if (seen) BlankNode(baseName, Some(varstack.size))
+      else BlankNode(baseName, None)
+    }
+
+    varstack.push(b)
+    b
+  }
+}
 
 /**
  * RDF Abstract syntax as per 2004 Recommendation
@@ -168,13 +192,15 @@ object AbstractSyntax {
     }
   }
 
-  def fresh(): Application = {
-    val i = "http://www.w3.org/2000/10/swap/log#skolem@@" + new Thing()
+  var skolem_count = 0 // @@TODO: get rid of this or something.
+  def fresh(): FunctionTerm = {
+    skolem_count = skolem_count + 1
+    val i = "http://www.w3.org/2000/10/swap/log#skolem@@" + skolem_count
     URI(i)
   }
 
 
-  def skolemize(f: Formula, fresh: () => Application): Formula = {
+  def skolemize(f: Formula, fresh: () => FunctionTerm): Formula = {
     f match {
       case Exists(vars, g) => {
 	// make a substitution that maps each variable to a fresh ground term
@@ -214,8 +240,8 @@ object AbstractSyntax {
       case (Exists(vf, ff), Exists(vg, gg)) => {
 	val shared = vf filter (vg contains)
 	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
-	  val (sub, freshvars) = mksubst(shared, Nil, 
-					 shared.iterator.next, Map())
+	  val scope = new XMLNameScope(f.variables() ++ g.variables())
+	  val (sub, freshvars) = mksubst(shared, Nil, scope, Map())
 	  val g3 = gg.subst(sub)
 	  (Set() ++ freshvars ++ (vg filterNot (shared contains)), g3)
 	}
@@ -304,10 +330,12 @@ class Graph(val arcs: Iterable[Holds]) extends ConjunctiveKB {
     !solve(goal).isEmpty
   }
 
+  val vars = new XMLNameScope(arcs.flatMap { arc => arc.variables() })
+
   /**
    * Handy variable specific to this graph for use in queries.
    */
-  val qvar = BlankNode("Q", None).fresh()
+  val qvar = vars.fresh("Q")
 }
 
 object Semantics {

@@ -28,7 +28,7 @@ object RDFaSyntax{
 
   // TODO: rename Holds to Arc? just use scala tuple here?
   def getArcs(e: xml.Elem, base: String): Stream[Holds] = {
-    walk(e, base, URI(base), null, List(), List(), null)
+    walk(e, base, new XMLNameScope(), URI(base), null, List(), List(), null)
   }
 
   /**
@@ -46,9 +46,8 @@ object RDFaSyntax{
    *                   from evaluation context, reverse direction
    * @param lang1: [language] from step 1
    *
-   * // TODO: ensure generated blanknodes don't overlap with those we read.
    */
-  def walk(e: xml.Elem, base: String,
+  def walk(e: xml.Elem, base: String, vars: XMLNameScope,
 	   subj1: Term, obj1: Term,
 	   pending1f: Iterable[Term], pending1r: Iterable[Term],
 	   lang1: Symbol): Stream[Holds] = {
@@ -65,7 +64,7 @@ object RDFaSyntax{
     val revterms = CURIE.refN((e \ "@rev").text, e, true)
     val types = CURIE.refN((e \ "@typeof").text, e, false)
     val props = CURIE.refN((e \ "@property").text, e, false)
-    val (subj45, objref5, skip) = subjectObject(obj1, e, base,
+    val (subj45, objref5, skip) = subjectObject(obj1, e, base, vars,
 						relterms.isEmpty &&
 						revterms.isEmpty,
 						types, props)
@@ -90,7 +89,7 @@ object RDFaSyntax{
     // step 8 incomplete triples.
     val (objref8, pending8f, pending8r) = {
       if (objref5 == null && !(relterms.isEmpty && revterms.isEmpty))
-	(BlankNode("it8", Some(e.hashCode())), relterms, revterms)
+	(vars.fresh("x8"), relterms, revterms)
       else (objref5, List(), List())
     }
 
@@ -110,8 +109,9 @@ object RDFaSyntax{
     arcs6 ++ arcs7 ++ arcs9 ++ arcs10 ++ (if (!xmlobj) {
       e.child.toStream.flatMap {
 	case c: xml.Elem => {
-	  if (skip) walk(c, base, subj1, obj1, pending8f, pending8r, lang)
-	  else walk(c, base,
+	  if (skip) walk(c, base, vars, subj1, obj1,
+			 pending8f, pending8r, lang)
+	  else walk(c, base, vars,
 		    if (subj45 != null) subj45 else subj1,
 		    (if (objref8 != null) objref8
 		     else if (subj45 != null) subj45
@@ -127,7 +127,7 @@ object RDFaSyntax{
    * steps 4 and 5, refactored
    * @return: new subject, new object ref, skip flag
    */
-  def subjectObject(obj1: Term, e: xml.Elem, base: String,
+  def subjectObject(obj1: Term, e: xml.Elem, base: String, vars: XMLNameScope,
 		    norel: Boolean,
 		    types: Iterable[URI], props: Iterable[URI]
 		  ): (Term, Term, Boolean) = {
@@ -137,17 +137,19 @@ object RDFaSyntax{
     lazy val href = e \ "@href"
 
     val subj45x = {
-      if (!about.isEmpty) CURIE.ref1(about.text, e, base)
+      if (!about.isEmpty) CURIE.ref1(about.text, e, base, vars)
       else if (!src.isEmpty) URI(combine(base, src.text))
-      else if (norel && !resource.isEmpty) CURIE.ref1(resource.text, e, base)
+      else if (norel && !resource.isEmpty)
+	CURIE.ref1(resource.text, e, base, vars)
       else if (norel && !href.isEmpty) URI(combine(base, href.text))
       // hmm... host language creeping in here...
       else if (e.label == "head" || e.label == "body") URI(combine(base, ""))
-      else if (!types.isEmpty) BlankNode("it4", Some(e.hashCode()))
+      else if (!types.isEmpty) vars.fresh("x4")
       else null
     }
 
-    val objref5 = (if (!resource.isEmpty) CURIE.ref1(resource.text, e, base)
+    val objref5 = (if (!resource.isEmpty) CURIE.ref1(resource.text,
+						     e, base, vars)
 		   else if (!href.isEmpty) URI(combine(base, href.text))
 		   else null
 		 )
@@ -217,18 +219,19 @@ object CURIE {
   /**
    * expand one safe curie or URI reference
    *
-   * scala> ref1("abc", e, "data:")
+   * scala> ref1("abc", e, "data:", new XMLNameScope())
    * res0: URI = URI("data:abc")
    * 
-   * scala> ref1("[abc:def]", e, "data:")
+   * scala> ref1("[abc:def]", e, "data:", new XMLNameScope())
    * res0: URI = URI("http://example/abc#def")
    *
-   * scala> ref1("[_:abc]", e, "data:")
+   * scala> ref1("[_:abc]", e, "data:", new XMLNameScope())
    * res0: URI = BlankNode(abc, None)
    * 
    */
-  def ref1(ref: String, e: xml.Elem, base: String): Term = ref match {
-    case parts2(p, _, l) if p == "_" => BlankNode(l, None)
+  def ref1(ref: String, e: xml.Elem, base: String,
+	   vars: XMLNameScope): Term = ref match {
+    case parts2(p, _, l) if p == "_" => vars.fresh(l)
     case parts2(p, _, l) if p != null => URI(expand(p, l, e))
     case _ => URI(combine(base, ref))
   }
@@ -261,6 +264,7 @@ object CURIE {
 		       "up")
   val xhv = "http://www.w3.org/1999/xhtml/vocab#"
 
+  // TODO: check whether _:xxx is allowed in, e.g., @typeof
   def refN(curies: String, e: xml.Elem, bare: Boolean): Iterable[URI] = {
     for {
       CURIE.parts(p, _, l) <- "\\s+".r.split(curies)

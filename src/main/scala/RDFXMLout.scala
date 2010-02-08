@@ -33,20 +33,13 @@ object RDFXMLout{
 
   def asxml(arc: Holds): Elem = {
 
-    def id(b: BlankNode) = b match {
-      case BlankNode(n, None) => n
-      // TODO: ensure that x.toString() consists only of XML name chars
-      case BlankNode(n, Some(x)) => n + x.toString()
-    }
-
     def attr1(pfx: String, name: String, value: String) =
       new xml.PrefixedAttribute(pfx, name, value, xml.Null)
 
     val subjattr = arc.s match {
       case URI(i) => attr1("rdf", "about", i)
 
-      // TODO: resolve doubts about uniqueness of these names
-      case v: BlankNode => attr1("rdf", "nodeID", id(v))
+      case v: BlankNode => attr1("rdf", "nodeID", v.sym.name)
     }
 
     val propElem = arc.p match {
@@ -55,7 +48,7 @@ object RDFXMLout{
 
 	arc.o match {
 	  case v: BlankNode =>
-	    Elem("ns0", ln, attr1("rdf", "nodeID", id(v)), pns)
+	    Elem("ns0", ln, attr1("rdf", "nodeID", v.sym.name), pns)
 	  case URI(i) =>
 	    Elem("ns0", ln, attr1("rdf", "resource", i), pns)
 

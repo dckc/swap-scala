@@ -105,7 +105,7 @@ case class Forall(override val vars: Set[Variable],
  * See <a href="http://en.wikipedia.org/wiki/First-order_logic#Terms"
  * >Terms</a> in the wikipedia article.
  *
- * A Term is either a Variable or an Application, i.e. a function term.
+ * A Term is either a Variable or an FunctionTerm, i.e. a function term.
  */
 sealed abstract class Term() {
   import AbstractSyntax.Subst
@@ -133,16 +133,13 @@ abstract class Variable() extends Term {
   override def subst(s: Subst) = lookup(this, s)
 
   override def variables() = ListSet(this)
-
-  /**
-   * Produce a fresh variable.
-   * We guarantee that fresh(fresh(x)) != fresh(x)
-   * but not necessarily fresh(x) != fresh(y)
-   */
-  def fresh(): Variable
 }
 
-abstract class Application() extends Term {
+abstract class Scope(val vars: Iterable[Variable]) {
+  def fresh(suggestedName: String): Variable
+}
+
+abstract class FunctionTerm() extends Term {
   def fun: Any
   def args: List[Term]
 
@@ -157,7 +154,7 @@ abstract class Application() extends Term {
 /**
  * Literal terms act as 0-ary function terms.
  */
-case class Literal(val value: Any) extends Application {
+case class Literal(val value: Any) extends FunctionTerm {
   import AbstractSyntax.Subst
 
   override def fun = value
@@ -167,7 +164,7 @@ case class Literal(val value: Any) extends Application {
   override def quote() = Atom(value)
 }
 
-case class Apply(sym: Symbol, terms: List[Term]) extends Application {
+case class Apply(sym: Symbol, terms: List[Term]) extends FunctionTerm {
   override def fun = sym
   override def args = terms
 
@@ -218,9 +215,9 @@ object AbstractSyntax {
     if (t1 == t2) Some(s)
     else t1 match {
       case v1: Variable => Some(s + (v1 -> t2))
-      case a1: Application => t2 match {
+      case a1: FunctionTerm => t2 match {
 	case v2: Variable => Some(s + (v2 -> t1))
-	case a2: Application => {
+	case a2: FunctionTerm => {
 	  if (a1.fun == a2.fun) unifyall(a1.args, a2.args, s)
 	  else None
 	}
@@ -248,9 +245,9 @@ object AbstractSyntax {
     if (pat == data) Some(s)
     else pat match {
       case v1: Variable => Some(s + (v1 -> data))
-      case a1: Application => data match {
+      case a1: FunctionTerm => data match {
 	case v2: Variable => None
-	case a2: Application => {
+	case a2: FunctionTerm => {
 	  if (a1.fun == a2.fun) matchAll(a1.args, a2.args, s)
 	  else None
 	}
@@ -273,17 +270,17 @@ object AbstractSyntax {
     }
   }
 
-  def renamevars(f: Formula, todo: Set[Variable], root: Variable): Formula = {
-    val (sub, _) = mksubst(todo, Nil, root, Map())
+  def renamevars(f: Formula, todo: Set[Variable], scope: Scope): Formula = {
+    val (sub, _) = mksubst(todo, Nil, scope, Map())
     f.subst(sub)
   }
 
   @tailrec
   def mksubst(todo: Iterable[Variable], done: List[Variable],
-	      root: Variable, s: Subst): (Subst, List[Variable]) = {
+	      scope: Scope, s: Subst): (Subst, List[Variable]) = {
     if (todo.isEmpty) (s, done) else {
-      val vr = root.fresh()
-      mksubst(todo.tail, vr :: done, root, s + (todo.head -> vr))
+      val vr = scope.fresh(todo.head.quote().toString())
+      mksubst(todo.tail, vr :: done, scope, s + (todo.head -> vr))
     }
   }
 }

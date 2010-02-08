@@ -64,7 +64,7 @@ extends TestSuite(manifest) {
   import swap.rdf.Semantics.entails
 
   val what = manifest.qvar
-  val what2 = what.fresh()
+  val what2 = manifest.vars.fresh("what")
   
   override def run(): Stream[(Term, String, TestResult)] = {
     for {
@@ -165,7 +165,7 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
   import swap.rdf.Semantics.entails
 
   val what = manifest.qvar
-  val what2 = what.fresh()
+  val what2 = manifest.vars.fresh("what")
   
   override def run(): Stream[(Term, String, TestResult)] = {
     for {

@@ -14,7 +14,7 @@ class RDFXMLParser(base: String) {
 
   import scala.collection.mutable
   val statements = new mutable.Stack[Formula]()
-  val blank = BlankNode("node", None) // source of fresh variables
+  val vars = new XMLNameScope()
 
   def parse(e: Elem): Formula = {
     e match {
@@ -50,7 +50,7 @@ class RDFXMLParser(base: String) {
       if (about.length > 0) URI(combine(base, about.text))
       else if (id.length > 0) URI(combine(base, "#" + id.text))
       else if (nodeID.length > 0) BlankNode(nodeID.text, None)
-      else blank.fresh()
+      else vars.fresh("it")
     }
     
     ne match {
@@ -85,7 +85,7 @@ class RDFXMLParser(base: String) {
 
 	val obj = (pt.text, elems.length) match {
 	  case ("Resource", _) => {
-	    val r = blank.fresh()
+	    val r = vars.fresh("it")
 	    parseProperties(r, e.child)
 	    r
 	  }

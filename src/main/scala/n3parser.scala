@@ -151,7 +151,7 @@ abstract class TextRDF(val baseURI: String) extends N3Lex {
 
   import scala.collection.mutable
   val namespaces = mutable.HashMap[String, String]()
-  val brackets = BlankNode("something", None)
+  val brackets = new swap.rdf.XMLNameScope()
 
   case class Scope(avars: mutable.Stack[Variable],
 		   evars: mutable.Stack[Variable],
@@ -256,7 +256,7 @@ abstract class TextRDF(val baseURI: String) extends N3Lex {
     | literal
     | "[" ~> propertylist <~ "]" ^^ {
       case props => {
-	val fresh = brackets.fresh()
+	val fresh = brackets.fresh("something")
 	scopes.top.evars.push(fresh)
 	mkprops(fresh, props)
 	fresh

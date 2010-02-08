@@ -22,7 +22,7 @@ abstract class ConjunctiveKB {
    */
   def solve(goal: Formula, s: Subst): Stream[Subst] = {
     def tokens(terms: Seq[Term]): Seq[Any] = {
-      terms.flatMap {case ap: Application => Some(ap.fun); case _ => None}
+      terms.flatMap {case ap: FunctionTerm => Some(ap.fun); case _ => None}
     }
 
     //println("solve: checking goal: " + goal)

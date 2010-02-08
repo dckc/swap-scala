@@ -22,15 +22,17 @@ object N3Tool {
   }
 
   def readN3(fname: String) {
-    val base = "data:@@" // TODO: learn how to get the directory of a file
+    val base = swap.WebData.asURI(fname)
     val parser = new N3Parser(base)
     try {
       val reader = new FileReader(fname)
       val result = parser.parseAll(parser.document, reader)
 
       result match {
-	// TODO: should use a Writer rather than buffering in memory
-	case parser.Success(f, _ ) => println(f.quote().pretty())
+	case parser.Success(f, _ ) => {
+	  val stdout = new java.io.OutputStreamWriter(java.lang.System.out)
+	  f.quote().writeTo(stdout)
+	}
 	case parser.Failure(x, y) => {
 	  println("N3Parser failure:")
 	  println(x)

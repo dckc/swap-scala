@@ -18,7 +18,6 @@ class LogicSyntax extends Spec with ShouldMatchers {
   }
 
   case class V(n: Symbol) extends Variable {
-    override def fresh() = V(Symbol(n.name + this.hashCode()))
     override def quote() = n
   }
 
