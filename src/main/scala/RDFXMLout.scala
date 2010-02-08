@@ -9,10 +9,22 @@ import scala.xml.{Elem, NamespaceBinding, TopScope}
 object RDFXMLout{
   val rdfdecl = NamespaceBinding("rdf", Vocabulary.nsuri, TopScope)
 
+  // TODO: get rid of this in favor of write methods below...
   def asxml(g: Graph): Elem = {
     new Elem("rdf", "RDF", xml.Null, rdfdecl,
 	     // TODO: noodle on collection api some more (scalaq)
 	     new xml.Group(g.arcs.map(arc => asxml(arc)).toSeq) )
+  }
+
+  def writeArcsDoc(w: java.io.Writer, arcs: Iterable[Holds]) {
+    w.write("""<rdf:RDF xmlns:rdf="RDFNS">""".replace("RDFNS",
+						      Vocabulary.nsuri) + "\n")
+    arcs foreach { case arc =>
+      xml.XML.write(w, asxml(arc), "utf-8", false, null)
+      w.write("\n")
+    }
+
+    w.write("""</rdf:RDF>""" + "\n")
   }
 
   // TODO: real character classes for namestartchar, namechar

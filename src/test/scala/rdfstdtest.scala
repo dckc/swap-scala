@@ -210,7 +210,6 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 
 class RDFaExample(indoc: String, outdoc: String) {
   import swap.rdf.Semantics.entails
-  import swap.rdf.RDFaParser
 
   def run(): Stream[(Term, String, TestResult)] = {
     val base = WebData.asURI(indoc)

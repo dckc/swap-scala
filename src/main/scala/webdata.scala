@@ -70,12 +70,12 @@ object WebData {
   }
     
   def loadRDFa(addr: String): Formula = {
-    import org.w3.swap.rdf.RDFaParser
+    import org.w3.swap.rdf.RDFaSyntax
 
+    // TODO: suggest media type with Accept: headers; check Content-type
     val e = XML.load(addr)
     val base = e \ "head" \ "base" \ "@href"
-    val p = new RDFaParser(if (base.isEmpty) addr else base.text)
-    p.parse(e)
+    RDFaSyntax.getFormula(e, if (base.isEmpty) addr else base.text)
   }
 
   /**

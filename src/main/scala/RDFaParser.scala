@@ -13,29 +13,30 @@ import scala.xml
  * @See: <a href="http://www.w3.org/TR/rdfa-syntax/"
  * >RDFa in XHTML: Syntax and Processing</a>
  * W3C Recommendation 14 October 2008
- * 
+ *
  */
-class RDFaParser(base: String) {
+object RDFaSyntax{
+  // TODO: consider making rdf.AbstractSyntax an interface/trait...
   import AbstractSyntax.{plain, text, data, rdf_type, xml => xmllit }
 
-  import scala.collection.mutable
-  val statements = new mutable.Stack[Formula]()
-  val blank = BlankNode("node", None) // source of fresh variables
-
-  def parse(e: xml.Elem): Formula = {
-    walk(e, URI(base), null, List(), List(), null)
-
-    val f1 = And(statements.toList.reverse)
+  def getFormula(e: xml.Elem, base: String): Formula = {
+    val f1 = And(getArcs(e, base).iterator.toSeq)
     val vars = f1.variables()
     if (vars.isEmpty) f1
     else Exists(vars, f1)
   }
 
+  // TODO: rename Holds to Arc? just use scala tuple here?
+  def getArcs(e: xml.Elem, base: String): Stream[Holds] = {
+    walk(e, base, URI(base), null, List(), List(), null)
+  }
+
   /**
-   * walk element recursively, producing triples
+   * Walk element recursively, finding arcs (atomic formulas).
    * 
-   * based on 5.5. Sequence
-   * http://www.w3.org/TR/rdfa-syntax/#sec_5.5.
+   * based on section <a href="http://www.w3.org/TR/rdfa-syntax/#sec_5.5."
+   * >5.5. Sequence</a>
+   * 
    *
    * @param subj1: [parent subject] from step 1
    * @param obj1: [parent object] from step 1
@@ -45,10 +46,12 @@ class RDFaParser(base: String) {
    *                   from evaluation context, reverse direction
    * @param lang1: [language] from step 1
    *
+   * // TODO: ensure generated blanknodes don't overlap with those we read.
    */
-  def walk(e: xml.Elem, subj1: Term, obj1: Term,
+  def walk(e: xml.Elem, base: String,
+	   subj1: Term, obj1: Term,
 	   pending1f: Iterable[Term], pending1r: Iterable[Term],
-	   lang1: Symbol) {
+	   lang1: Symbol): Stream[Holds] = {
     assert(subj1 != null) // with NotNull doesn't seem to work. scalaq?
 
     // step 2., URI mappings, is taken care of by scala.xml
@@ -62,63 +65,69 @@ class RDFaParser(base: String) {
     val revterms = CURIE.refN((e \ "@rev").text, e, true)
     val types = CURIE.refN((e \ "@typeof").text, e, false)
     val props = CURIE.refN((e \ "@property").text, e, false)
-    val (subj45, objref5, skip) = subjectObject(obj1, e,
+    val (subj45, objref5, skip) = subjectObject(obj1, e, base,
 						relterms.isEmpty &&
 						revterms.isEmpty,
 						types, props)
 
     // step 6. typeof
-    if (subj45 != null)
-      for (cls <- types) statements.push(Holds(subj45, rdf_type, cls))
+    val arcs6 = {
+      if (subj45 != null)
+	types.toStream.map(cls => Holds(subj45, rdf_type, cls))
+      else Stream.empty
+    }
 
     // step 7 rel/rev triples
     // HTML grammar guarantees a subject at this point, I think,
     // but in an effort to stay host-language-neutral, let's double-check
-    if (objref5 != null && subj45 != null) {
-      for (p <- relterms)
-	statements.push(Holds(subj45, p, objref5))
-      for (p <- revterms)
-	statements.push(Holds(objref5, p, subj45))
+    val arcs7 = {
+      if (objref5 != null && subj45 != null) {
+	(for (p <- relterms.toStream) yield Holds(subj45, p, objref5)) ++
+	(for (p <- revterms.toStream) yield Holds(objref5, p, subj45))
+      } else Stream.empty
     }
 
     // step 8 incomplete triples.
-    val (objref8, pending8f, pending8r) = (
+    val (objref8, pending8f, pending8r) = {
       if (objref5 == null && !(relterms.isEmpty && revterms.isEmpty))
-	(blank.fresh(), relterms, revterms)
-      else (objref5, List(), List()) )
-
-    // step 9 literal object
-    val xmlobj = if (!props.isEmpty) literalObject(subj45, props, lang, e)
-		 else false
-
-    // step 10 complete incomplete triples.
-    if (!skip && subj45 != null) {
-      for(p <- pending1f) statements.push(Holds(subj1, p, subj45))
-      for(p <- pending1r) statements.push(Holds(subj45, p, subj1))
+	(BlankNode("it8", Some(e.hashCode())), relterms, revterms)
+      else (objref5, List(), List())
     }
 
+    // step 9 literal object
+    val (arcs9, xmlobj) = {
+      if (!props.isEmpty) literalObject(subj45, props, lang, e)
+      else (Stream.empty, false)
+    }
+
+    // step 10 complete incomplete triples.
+    val arcs10: Stream[Holds] = if (!skip && subj45 != null) {
+      pending1f.toStream.map(Holds(subj1, _, subj45)) ++
+      pending1r.toStream.map(Holds(subj45, _, subj1))
+    } else Stream.empty
+
     // step 11. recur
-    if (!xmlobj) {
-      e.child.foreach {
+    arcs6 ++ arcs7 ++ arcs9 ++ arcs10 ++ (if (!xmlobj) {
+      e.child.toStream.flatMap {
 	case c: xml.Elem => {
-	  if (skip) walk(c, subj1, obj1, pending8f, pending8r, lang)
-	  else walk(c,
+	  if (skip) walk(c, base, subj1, obj1, pending8f, pending8r, lang)
+	  else walk(c, base,
 		    if (subj45 != null) subj45 else subj1,
 		    (if (objref8 != null) objref8
 		     else if (subj45 != null) subj45
 		     else subj1),
 		    pending8f, pending8r, lang)
 	}
-	case _ => /* never mind stuff other than elements */
+	case _ => Stream.empty /* never mind stuff other than elements */
       }
-    }
+    } else Stream.empty)
   }
 
   /**
    * steps 4 and 5, refactored
    * @return: new subject, new object ref, skip flag
    */
-  def subjectObject(obj1: Term, e: xml.Elem,
+  def subjectObject(obj1: Term, e: xml.Elem, base: String,
 		    norel: Boolean,
 		    types: Iterable[URI], props: Iterable[URI]
 		  ): (Term, Term, Boolean) = {
@@ -134,7 +143,7 @@ class RDFaParser(base: String) {
       else if (norel && !href.isEmpty) URI(combine(base, href.text))
       // hmm... host language creeping in here...
       else if (e.label == "head" || e.label == "body") URI(combine(base, ""))
-      else if (!types.isEmpty) blank.fresh()
+      else if (!types.isEmpty) BlankNode("it4", Some(e.hashCode()))
       else null
     }
 
@@ -152,10 +161,10 @@ class RDFaParser(base: String) {
   /**
    * step 9 literal object
    * side effect: pushes statements
-   * @return: true iff object is XMLLiteral
+   * @return: (arcs, xmllit) where xmllit is true iff object is XMLLiteral
    */
   def literalObject(subj: Term, props: Iterable[URI], lang: Symbol,
-		    e: xml.Elem): Boolean = {
+		    e: xml.Elem): (Stream[Holds], Boolean) = {
     val content = e \ "@content"
     val datatype = e \ "@datatype"
 
@@ -168,47 +177,33 @@ class RDFaParser(base: String) {
     }
 
     def sayit(obj: Term) = {
-      for(p <- props) statements.push(Holds(subj, p, obj))
+      for(p <- props.toStream) yield Holds(subj, p, obj)
     }
 
     (!datatype.isEmpty, !content.isEmpty) match {
-      case (true, _) if datatype.text == "" => sayit(txt(lex)); false
+      case (true, _) if datatype.text == "" => (sayit(txt(lex)), false)
 
       case (true, _) => {
 	datatype.text match {
 	  case CURIE.parts(p, _, l) if p != null => {
 	    val dt = CURIE.expand(p, l, e)
 
-	    if (dt == Vocabulary.XMLLiteral) {
-	      sayit(xmllit(e.child))
-	      true
-	    } else {
-	      sayit(data(lex, URI(dt)))
-	      false
-	    }
+	    if (dt == Vocabulary.XMLLiteral) (sayit(xmllit(e.child)), true)
+	    else (sayit(data(lex, URI(dt))), false)
 	  }
 	  /* TODO: update handling of goofy datatype values based on WG
 	   * response to 3 Feb comment. */
-	  case _ => false
+	  case _ => (Stream.empty, false)
 	}
       }
 
-      case (_, true) => sayit(txt(content.text)); false
-      case (_, _) if alltext => sayit(txt(e.text)); false
-      case (_, _) if e.child.isEmpty => sayit(txt("")); false
-      case (_, _) => sayit(xmllit(e.child)); true
+      case (_, true) => (sayit(txt(content.text)), false)
+      case (_, _) if alltext => (sayit(txt(e.text)), false)
+      case (_, _) if e.child.isEmpty => (sayit(txt("")), false)
+      case (_, _) => (sayit(xmllit(e.child)), true)
     }
   }
 
-
-  /**
-   * local, i.e. non-recursive processing.
-   *
-   * We'll handle the case of [skip element] set to 'false' here.
-   */
-  def local(e: xml.Elem) {
-  }
-  
 }
 
 object CURIE {

@@ -42,12 +42,11 @@ class RDFaExtractor extends HttpServlet {
     if (addr.startsWith("http://")){
       maybe { XML.load(addr) } match {
 	case Right(doc) => {
-	  val p = new swap.rdf.RDFaParser(addr)
-	  val g = new swap.rdf.Graph(p.parse(doc))
-	  val e2 = swap.rdf.RDFXMLout.asxml(g)
+	  val arcs = swap.rdf.RDFaSyntax.getArcs(doc, addr)
 	
 	  response.setContentType("application/rdf+xml")
-	  response.getWriter.println("" + e2)
+
+	  swap.rdf.RDFXMLout.writeArcsDoc(response.getWriter, arcs)
 	}
 	case Left(e: java.lang.IllegalArgumentException) =>
 	  response.sendError(HttpServletResponse.SC_BAD_REQUEST,

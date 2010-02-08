@@ -62,10 +62,13 @@ object N3Tool {
 
   def readRDFa(addr: String) {
     // TODO: stream triples as they come using a callback/Stream/etc.
-    val f = WebData.loadRDFa(WebData.asURI(addr))
-    val g = new rdf.Graph(f)
-    val e2 = rdf.RDFXMLout.asxml(g)
-    println(e2)
+    val base = WebData.asURI(addr)
+    val doc = scala.xml.XML.load(base)
+    val arcs = swap.rdf.RDFaSyntax.getArcs(doc, base)
+    val stdout = new java.io.OutputStreamWriter(java.lang.System.out)
+
+    swap.rdf.RDFXMLout.writeArcsDoc(stdout, arcs)
+    stdout.close()
   }
 }
 
