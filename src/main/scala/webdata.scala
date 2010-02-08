@@ -13,11 +13,13 @@ object WebData {
   // TODO: conneg
 
   def loadRDFXML(addr: String): Formula = {
-    import org.w3.swap.rdf.RDFXMLParser
+    import org.w3.swap.rdf.XMLtoRDF
 
     val e = XML.load(addr)
-    val p = new RDFXMLParser(addr) // @@TODO: absolutize base
-    p.parse(e)
+    val f1 = And(XMLtoRDF.getArcs(e, addr).iterator.toSeq)
+    val vars = f1.variables()
+    if (vars.isEmpty) f1
+    else Exists(vars, f1)
   }
 
   protected def content(addr: String): InputStreamReader = {

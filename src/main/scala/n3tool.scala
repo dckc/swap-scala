@@ -4,7 +4,6 @@ import java.io.{FileReader, FileNotFoundException}
 
 import org.w3.swap
 import swap.n3.N3Parser
-import swap.rdf.RDFXMLParser
 
 object N3Tool {
   def main(args: Array[String]): Unit = {
