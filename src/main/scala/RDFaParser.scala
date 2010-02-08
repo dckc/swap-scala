@@ -187,7 +187,7 @@ object RDFaSyntax{
     }
 
     (!datatype.isEmpty, !content.isEmpty) match {
-      case (true, _) if datatype.text == "" => (sayit(plain(lex)), false)
+      case (true, _) if datatype.text == "" => (sayit(txt(lex)), false)
 
       case (true, _) => {
 	datatype.text match {
