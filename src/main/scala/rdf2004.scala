@@ -62,8 +62,32 @@ extends swap.logic.Scope(vars) {
   def this() = this(List())
 
   import scala.collection.mutable
-  val varstack = new mutable.Stack[Variable]
-  varstack.pushAll(vars)
+  val varstack = new mutable.Stack[BlankNode]
+  vars foreach {
+    case v @ BlankNode(n, x) if safeName(n) == n => varstack.push(v)
+    case v @ BlankNode(n, x) => varstack.push(fresh(n))
+    case _ => varstack.push(fresh("v"))
+  }
+
+    /* baseName is a name that does *not* follow the xyx.123 pattern */
+  protected def safeName(name: String) = {
+    val lastChar = name.substring(name.length-1)
+    if("0123456789".contains(lastChar) &&
+       name.contains('.')) name + "_"
+    else name
+  }
+
+  /**
+   * Return a BlankNode for this name, creating one if necessary.
+   * @return: the same BlankNode given the same name.
+   */
+  def byName(name: String): BlankNode = {
+    var safe = safeName(name)
+    varstack.find { v => v.quote().toString() == safe } match {
+      case None => fresh(safe)
+      case Some(v) => v
+    }
+  }
 
   /**
    * @param suggestedName: an XML name
@@ -72,13 +96,7 @@ extends swap.logic.Scope(vars) {
   override def fresh(suggestedName: String): BlankNode = {
     assert(suggestedName.length > 0)
 
-    /* baseName is a name that does *not* follow the xyx.123 pattern */
-    val baseName = {
-      val lastChar = suggestedName.substring(suggestedName.length-1)
-      if("0123456789".contains(lastChar) &&
-	 suggestedName.contains('.')) suggestedName + "_"
-      else suggestedName
-    }
+    val baseName = safeName(suggestedName)
 
     val b = {
       val seen = varstack.exists { v => v.quote().toString() == baseName }

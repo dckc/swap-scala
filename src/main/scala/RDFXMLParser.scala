@@ -51,7 +51,7 @@ object XMLtoRDF {
     val subject = {
       if (about.length > 0) URI(combine(base, about.text))
       else if (id.length > 0) URI(combine(base, "#" + id.text))
-      else if (nodeID.length > 0) BlankNode(nodeID.text, None)
+      else if (nodeID.length > 0) vars.byName(nodeID.text)
       else vars.fresh("it")
     }
     
@@ -99,7 +99,7 @@ object XMLtoRDF {
 	    case ("Literal", _) => xml(e.child)
 	    case ("Collection", _) => plain("@@TODO: Collection")
 	    case ("", 0) if !res.isEmpty => URI(combine(base, res.text))
-	    case ("", 0) if !nid.isEmpty => BlankNode(nid.text, None)
+	    case ("", 0) if !nid.isEmpty => vars.byName(nid.text)
 	    case ("", 0) if !dt.isEmpty =>
 	      data(e.text, URI(combine(base, dt.text)))
 	    case ("", 0) if !lang.isEmpty => text(e.text, Symbol(lang.text))

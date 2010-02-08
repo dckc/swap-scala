@@ -231,7 +231,7 @@ object CURIE {
    */
   def ref1(ref: String, e: xml.Elem, base: String,
 	   vars: XMLNameScope): Term = ref match {
-    case parts2(p, _, l) if p == "_" => vars.fresh(l)
+    case parts2(p, _, l) if p == "_" => vars.byName(l)
     case parts2(p, _, l) if p != null => URI(expand(p, l, e))
     case _ => URI(combine(base, ref))
   }
