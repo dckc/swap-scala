@@ -16,15 +16,18 @@ object RDFXMLout{
 	     new xml.Group(g.arcs.map(arc => asxml(arc)).toSeq) )
   }
 
+  final val root = <rdf:RDF xmlns:rdf={Vocabulary.nsuri}>CONTENT</rdf:RDF>
+
   def writeArcsDoc(w: java.io.Writer, arcs: Iterable[Holds]) {
-    w.write("""<rdf:RDF xmlns:rdf="RDFNS">""".replace("RDFNS",
-						      Vocabulary.nsuri) + "\n")
+    val rootTags = root.toString().split("CONTENT")
+    w.write(rootTags(0) + "\n")
+
     arcs foreach { case arc =>
       xml.XML.write(w, asxml(arc), "utf-8", false, null)
       w.write("\n")
     }
 
-    w.write("""</rdf:RDF>""" + "\n")
+    w.write(rootTags(1) + "\n")
   }
 
   // TODO: real character classes for namestartchar, namechar
