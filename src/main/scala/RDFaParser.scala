@@ -213,9 +213,15 @@ object RDFaSyntax{
 object CURIE {
   import scala.util.matching.Regex
 
-  final val parts = new Regex("""^(?:([^:]+)?:)?(.*)$""",
+  /*
+   * spec says
+   *   prefix := NName
+   * but then speaks of :p having a "default prefix"
+   * so we match the empty prefix here.
+   */
+  final val parts = new Regex("""^(?:([^:]*)?:)?(.*)$""",
 			      "prefix", "reference")
-  final val parts2 = new Regex("""^\[(?:([^:]+)?:)?(.*)\]$""",
+  final val parts2 = new Regex("""^\[(?:([^:]*)?:)?(.*)\]$""",
 			       "prefix", "reference")
 
   /**
@@ -277,7 +283,7 @@ object CURIE {
   }
 
   def expand(p: String, l: String, e: xml.Elem): String = {
-    val ns = if (p == null) xhv else e.getNamespace(p)
+    val ns = if (p == "") xhv else e.getNamespace(p)
 
     if (ns == null) {
       // TODO: find out if we're supposed to ignore this error.
