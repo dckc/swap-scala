@@ -10,7 +10,7 @@ class RDFaMisc extends Spec with ShouldMatchers {
 
   describe("RDFa walker") {
 
-    it("should @@") {
+    it("should stop chaining on bogus rel values (Test #105) ") {
       val e1 = <div
       xmlns:dc="http://purl.org/dc/elements/1.1/"
       about="" 

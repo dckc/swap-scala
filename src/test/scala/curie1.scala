@@ -41,5 +41,12 @@ class CURIE1 extends Spec with ShouldMatchers {
 	List()
       )
     }
+
+    it("should not allow _ to be declared as a namespace prefix") {
+      val e = <p xmlns:_="http://example.org/" property="_:test">Test</p>
+      CURIE.refN(e, "@property", false) should equal (
+	List()
+      )
+    }
   }
 }
