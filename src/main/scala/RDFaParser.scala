@@ -283,8 +283,8 @@ object CURIE {
 
   def refN(e: xml.Elem, attr: String, bare: Boolean): Iterable[URI] = {
     "\\s+".r.split((e \ attr).text) flatMap {
-      case token if (bare && reserved.contains(token)) =>
-	List(URI(xhv + token))
+      case token if (bare && reserved.contains(token.toLowerCase)) =>
+	List(URI(xhv + token.toLowerCase))
 
       case CURIE.parts(p, l) if (p == null) => Nil // foo
 

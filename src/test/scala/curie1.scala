@@ -42,6 +42,23 @@ class CURIE1 extends Spec with ShouldMatchers {
       )
     }
 
+    it("should normalize case of link types") {
+      val elt = <a rel="NEXT" href="ben.html">Ben</a>
+      CURIE.refN(elt, "@rel", true) should equal (
+	List(URI(CURIE.xhv + "next"))
+      )
+
+      val elt2 = <a rel="NeXT" href="ben.html">Ben</a>
+      CURIE.refN(elt2, "@rel", true) should equal (
+	List(URI(CURIE.xhv + "next"))
+      )
+
+      val elt3 = <a rel="neXt" href="ben.html">Ben</a>
+      CURIE.refN(elt3, "@rel", true) should equal (
+	List(URI(CURIE.xhv + "next"))
+      )
+    }
+
     it("should skip undeclared prefixes") {
       val elt = <p property="dc:test">Test</p>
       CURIE.refN(elt, "@property", false) should equal (
