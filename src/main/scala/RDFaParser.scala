@@ -190,10 +190,14 @@ object RDFaSyntax{
       case (true, _) => {
 	datatype.text match {
 	  case CURIE.parts(p, l) if p != null => {
-	    val dt = CURIE.expand(p, l, e)
+	    try {
+	      val dt = CURIE.expand(p, l, e)
 
-	    if (dt == Vocabulary.XMLLiteral) (sayit(xmllit(e.child)), true)
-	    else (sayit(data(lex, URI(dt))), false)
+	      if (dt == Vocabulary.XMLLiteral) (sayit(xmllit(e.child)), true)
+	      else (sayit(data(lex, URI(dt))), false)
+	    } catch {
+	      case e: NotDefinedError => (Stream.empty, false)
+	    }
 	  }
 	  /* TODO: update handling of goofy datatype values based on WG
 	   * response to 3 Feb comment. */
@@ -209,6 +213,12 @@ object RDFaSyntax{
   }
 
 }
+
+
+/**
+ * There is perhaps a more general notion of CURIE, but this captures
+ * only the RDFa-specific notion.
+ */
 
 object CURIE {
   import scala.util.matching.Regex
@@ -280,7 +290,13 @@ object CURIE {
 
       case CURIE.parts(p, l) if (p == "_") => Nil // _:foo
 
-      case CURIE.parts(p, l) =>	List(URI(CURIE.expand(p, l, e)))
+      case CURIE.parts(p, l) if (p == "xml") => Nil // xml:foo
+
+      case CURIE.parts(p, l) =>	try {
+	List(URI(CURIE.expand(p, l, e)))
+      } catch {
+	case e: NotDefinedError => Nil
+      }
 
       case _ => Nil
     }
