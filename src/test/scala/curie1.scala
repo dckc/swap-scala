@@ -5,7 +5,7 @@ import org.w3.swap
 import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
-class CURIEmisc extends Spec with ShouldMatchers {
+class CURIE1 extends Spec with ShouldMatchers {
   import swap.rdf.{URI, CURIE}
 
   describe("CURIE handler") {
@@ -32,6 +32,13 @@ class CURIEmisc extends Spec with ShouldMatchers {
 
       CURIE.refN(e2, "@rel", true) should equal (
 	List(URI(CURIE.xhv + "next"))
+      )
+    }
+
+    it("should skip bogus rel values") {
+      val elt = <a rel="myfoobarrel" href="ben.html">Ben</a>
+      CURIE.refN(elt, "@rel", true) should equal (
+	List()
       )
     }
   }

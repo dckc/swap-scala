@@ -69,8 +69,8 @@ object RDFaSyntax{
     val types = CURIE.refN(e, "@typeof", false)
     val props = CURIE.refN(e, "@property", false)
     val (subj45, objref5, skip) = subjectObject(obj1, e, base, vars,
-						relterms.isEmpty &&
-						revterms.isEmpty,
+						(e \ "@rel").isEmpty &&
+						(e \ "@rev").isEmpty,
 						types, props)
 
     // step 6. typeof
