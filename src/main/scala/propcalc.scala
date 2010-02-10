@@ -4,29 +4,7 @@ package org.w3.swap.logic0
  * Shoenfield's rules of propositional calculus [83]
  * from Milawa.
  */
-
-abstract class PropositionalCalculus {
-  //@@TODO: abstract class Formula
-  import org.w3.swap
-  import swap.logic.{Formula, Unary, Binary}
-
-  def wff(f: Formula): Boolean
-
-  case class Or(A: Formula, B: Formula) extends Binary(A, B){
-    import swap.sexp.SExp.fromSeq
-    import swap.logic.AbstractSyntax.Subst
-    def quote() = fromSeq(List(Symbol("POR*"), A.quote(), B.quote()))
-    def subst(s: Subst) = Or(A.subst(s), B.subst(s))
-  }
-  case class Not(A: Formula) extends Unary(A){
-    import swap.sexp.SExp.fromSeq
-    import swap.logic.AbstractSyntax.Subst
-    def quote() = fromSeq(List(Symbol("PNOT*"), A.quote()))
-    def subst(s: Subst) = Not(A.subst(s))
-  }
-
-
-
+abstract class PropositionalCalculus extends FormalSystem {
   /**
    * From ((A or B) or C) derive (A or (B or C))
    */
@@ -89,4 +67,21 @@ abstract class PropositionalCalculus {
     }
   }
 
+  val methods = List('ASSOCIATIVITY, 'CONTRACTION, 'CUT, 'EXPANSION,
+		     'PROPOSITIONAL_SCHEMA)
+
+  def rule(method: Symbol): Rule = {
+    assert(methods contains method)
+    // TODO: consider moving rules in here and using match
+    val rules = List(associativity _, contraction _, cut _, expansion _,
+		     propositional_schema _)
+    rules(methods.indexOf(method))
+  }
+
+  // TODO: perhaps def implies(a, b) = Or(Not(a), b)
+  // TODO: perhaps def and(a, b) = Not(Or(Not(a), Not(b)))
 }
+
+case class Or(a: Formula, b: Formula) extends Formula
+case class Not(a: Formula) extends Formula
+

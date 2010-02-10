@@ -28,6 +28,8 @@ sealed abstract class SExp {
     w.toString()
   }
 
+  override def toString() = pretty()
+
   def doc: Document
 
   def writeTo(w: Writer)
