@@ -42,8 +42,17 @@ abstract class Atomic extends Formula {
   override def freevars() = variables()
 }
 
-abstract class Unary(f: Formula) extends Formula
-abstract class Binary(f: Formula, g: Formula) extends Formula
+abstract class Unary(f: Formula) extends Formula{
+  override def variables() = f.variables()
+  override def freevars() = f.freevars()
+  override def terms() = f.terms()
+}
+abstract class Binary(f: Formula, g: Formula) extends Formula{
+  override def variables() = f.variables() ++ g.variables()
+  override def freevars() = f.freevars() ++ g.freevars()
+  override def terms() = f.terms() ++ g.terms()
+}
+
 abstract class Nary(val connective: Symbol,
 		    val fl: Seq[Formula]) extends Formula {
   override def quote() = Cons(connective,
