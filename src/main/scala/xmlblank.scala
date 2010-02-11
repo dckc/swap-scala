@@ -7,7 +7,7 @@ import swap.logic1.Variable
  * Logical variables for RDF.
  * @param n: an XML name. TODO: assert this
  */
-case class BlankNode(val n: String, val qual: Option[Int]) extends Variable {
+case class XMLVar(val n: String, val qual: Option[Int]) extends Variable {
   // TODO: mix in Quotable
   def quote() = sym
 
@@ -21,10 +21,10 @@ class Scope(val vars: Iterable[Variable]) {
   def this() = this(List())
 
   import scala.collection.mutable
-  val varstack = new mutable.Stack[BlankNode]
+  val varstack = new mutable.Stack[XMLVar]
   vars foreach {
-    case v @ BlankNode(n, x) if safeName(n) == n => varstack.push(v)
-    case v @ BlankNode(n, x) => varstack.push(fresh(n))
+    case v @ XMLVar(n, x) if safeName(n) == n => varstack.push(v)
+    case v @ XMLVar(n, x) => varstack.push(fresh(n))
     case _ => varstack.push(fresh("v"))
   }
 
@@ -37,10 +37,10 @@ class Scope(val vars: Iterable[Variable]) {
   }
 
   /**
-   * Return a BlankNode for this name, creating one if necessary.
-   * @return: the same BlankNode given the same name.
+   * Return a XMLVar for this name, creating one if necessary.
+   * @return: the same XMLVar given the same name.
    */
-  def byName(name: String): BlankNode = {
+  def byName(name: String): XMLVar = {
     var safe = safeName(name)
     varstack.find { v => v.quote().toString() == safe } match {
       case None => fresh(safe)
@@ -52,15 +52,15 @@ class Scope(val vars: Iterable[Variable]) {
    * @param suggestedName: an XML name
    * @return an XML name unique to this scope
    */
-  def fresh(suggestedName: String): BlankNode = {
+  def fresh(suggestedName: String): XMLVar = {
     assert(suggestedName.length > 0)
 
     val baseName = safeName(suggestedName)
 
     val b = {
       val seen = varstack.exists { v => v.quote().toString() == baseName }
-      if (seen) BlankNode(baseName, Some(varstack.size))
-      else BlankNode(baseName, None)
+      if (seen) XMLVar(baseName, Some(varstack.size))
+      else XMLVar(baseName, None)
     }
 
     varstack.push(b)

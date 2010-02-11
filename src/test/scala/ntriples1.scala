@@ -14,7 +14,7 @@ import SExp.fromSeq
 
 
 class TestParser extends NTriplesSyntax with TermNode {
-  type BlankNode = swap.rdfxml.BlankNode
+  type BlankNode = swap.rdfxml.XMLVar
 
   val scope = new rdfxml.Scope()
   def blankNode(n: String) = scope.byName(n)
@@ -37,6 +37,13 @@ class TestParser extends NTriplesSyntax with TermNode {
 
     }
   }
+
+  def arcs(doc: String): Stream[Arc] = {
+    parseAll(ntripleDoc, doc) match {
+      case Success(arcs, _) => arcs
+      case _ => Stream.empty
+    }
+  }
 }
 
 
@@ -45,7 +52,7 @@ object TQ {
 
   def quote(term: Term): SExp = {
     term match {
-      case v: rdfxml.BlankNode => v.sym
+      case v: rdfxml.XMLVar => v.sym
       case Name(n) => fromSeq(List(Symbol(n)))
       case Plain(s, None) => Atom(s)
       case Plain(s, Some(code)) => fromSeq(List('text, Atom(s), Atom(code)))
@@ -76,6 +83,22 @@ _:somewhere <data:in> <data:Texas> .
   )"""
       )
 
+    }
+
+    it("should work with SimpleSerializer") {
+      val p = new TestParser()
+
+      // TODO: use stringwriter; check output
+      val wr = new java.io.StringWriter()
+      rdfxml.SimpleSerializer.writeArcsDoc(wr, p.arcs(doc))
+      wr.close()
+      wr.toString() should equal (
+	"""<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+<rdf:Description rdf:about="data:bob" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><ns0:home rdf:nodeID="somewhere" xmlns:ns0="data:"></ns0:home></rdf:Description>
+<rdf:Description rdf:nodeID="somewhere" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><ns0:in rdf:resource="data:Texas" xmlns:ns0="data:"></ns0:in></rdf:Description>
+</rdf:RDF>
+"""
+	)
     }
   }
 }

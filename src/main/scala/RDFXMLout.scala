@@ -1,24 +1,21 @@
-package org.w3.swap.rdf
+package org.w3.swap.rdfxml
 
 import org.w3.swap
-import swap.logic.{Formula, Apply, Literal}
+import swap.rdf.Vocabulary
+import swap.rdfgraph.RDFGraph
+import swap.rdflogic.{TermNode, Name, Plain, Data, XMLLit}
 
 import scala.xml
 import scala.xml.{Elem, NamespaceBinding, TopScope}
 
-object RDFXMLout{
-  val rdfdecl = NamespaceBinding("rdf", Vocabulary.nsuri, TopScope)
+object SimpleSerializer extends RDFGraph with TermNode {
+  type BlankNode = XMLVar
 
-  // TODO: get rid of this in favor of write methods below...
-  def asxml(g: Graph): Elem = {
-    new Elem("rdf", "RDF", xml.Null, rdfdecl,
-	     // TODO: noodle on collection api some more (scalaq)
-	     new xml.Group(g.arcs.map(arc => asxml(arc)).toSeq) )
-  }
+  val rdfdecl = NamespaceBinding("rdf", Vocabulary.nsuri, TopScope)
 
   final val root = <rdf:RDF xmlns:rdf={Vocabulary.nsuri}>CONTENT</rdf:RDF>
 
-  def writeArcsDoc(w: java.io.Writer, arcs: Iterable[Holds]) {
+  def writeArcsDoc(w: java.io.Writer, arcs: Iterable[Arc]) {
     val rootTags = root.toString().split("CONTENT")
     w.write(rootTags(0) + "\n")
 
@@ -34,45 +31,49 @@ object RDFXMLout{
   // TODO: ".../mbox_sha1sum" => (".../mbox_sha1", "sum")
   final val splitter = "(.*[^a-zA-Z])([a-zA-Z][a-zA-Z0-9_-]*)".r
 
-  def asxml(arc: Holds): Elem = {
+  def asxml(arc: Arc): Elem = {
 
     def attr1(pfx: String, name: String, value: String) =
       new xml.PrefixedAttribute(pfx, name, value, xml.Null)
 
-    val subjattr = arc.s match {
-      case URI(i) => attr1("rdf", "about", i)
+    val subjattr = arc._1 match {
+      case v: XMLVar => attr1("rdf", "nodeID", v.sym.name)
 
-      case v: BlankNode => attr1("rdf", "nodeID", v.sym.name)
+      case Name(i) => attr1("rdf", "about", i)
+
+      // TODO: check wf somewhere. assert/throw here?
+      case x => attr1("rdf", "about",
+		      "data:*oops-subject*" + x)
     }
 
-    val propElem = arc.p match {
-      case URI(splitter(ns, ln)) => {
+    val propElem = arc._2 match {
+      case Name(splitter(ns, ln)) => {
 	val pns = NamespaceBinding("ns0", ns, TopScope)
 
-	arc.o match {
+	arc._3 match {
 	  case v: BlankNode =>
 	    Elem("ns0", ln, attr1("rdf", "nodeID", v.sym.name), pns)
-	  case URI(i) =>
+	  case Name(i) =>
 	    Elem("ns0", ln, attr1("rdf", "resource", i), pns)
 
-	  case Literal(s: String) => true
+	  case Plain(s, None) =>
 	    Elem("ns0", ln, xml.Null, pns, xml.Text(s))
 
-	  case Apply('text,
-		     List(Literal(s: String), Literal(code: Symbol) )) =>
-	    Elem("ns0", ln, attr1("xml", "lang", code.name), pns, xml.Text(s))
+	  case Plain(s, Some(code)) =>
+	    Elem("ns0", ln, attr1("xml", "lang", code.name),
+		 pns, xml.Text(s))
 
-	  case Apply('data, List(URI(dt), Literal(s: String) )) =>
+	  case Data(s, Name(dt)) =>
 	    Elem("ns0", ln, attr1("rdf", "datatype", dt), pns, xml.Text(s))
 
-	  case Apply('xml, List(Literal(e: xml.NodeSeq))) =>
+	  case XMLLit(e) =>
 	    Elem("ns0", ln, attr1("rdf", "parseType", "Literal"),
 		 pns, new xml.Group(e))
 
-	  case _ => throw new Exception("object not well formed" + arc.o)
+	  case _ => throw new Exception("object not well formed" + arc._3)
 	}
       }
-      case _ => throw new Exception("@@can't split property URI" + arc.p)
+      case _ => throw new Exception("@@can't split property URI" + arc._2)
     }
 
     Elem("rdf", "Description", subjattr, rdfdecl, propElem)
