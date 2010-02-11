@@ -1,12 +1,22 @@
 package org.w3.swap.test
 
-import org.w3.swap
-
 import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
+import org.w3.swap
+import swap.rdflogic.{TermNode, Name}
+import swap.rdfa
+import swap.rdfxml
+
+object RDFaParser extends rdfa.RDFaSyntax with TermNode {
+  type BlankNode = rdfxml.XMLVar
+
+  lazy val vars = new rdfxml.Scope()
+  def fresh(hint: String) = vars.fresh(hint)
+  def byName(name: String) = vars.byName(name)
+}
+
 class RDFaMisc extends Spec with ShouldMatchers {
-  import swap.rdf.{RDFaSyntax, XMLNameScope, URI, Holds, BlankNode}
 
   describe("RDFa walker") {
 
@@ -19,10 +29,10 @@ class RDFaMisc extends Spec with ShouldMatchers {
       </div>
 
       var addr = "data:"
-      var arcs = RDFaSyntax.walk(e1, addr, new XMLNameScope(),
-				 URI(addr), null, Nil, Nil, null)
+      val undef = RDFaParser.undef
+      var arcs = RDFaParser.walk(e1, addr, Name(addr), undef, Nil, Nil, null)
       (arcs.force.head match {
-	case Holds(URI(_), URI(_), BlankNode(_, _)) => true
+	case (Name(_), Name(_), rdfxml.XMLVar(_, _)) => true
 	case _ => false
       }) should equal (true)
     }
