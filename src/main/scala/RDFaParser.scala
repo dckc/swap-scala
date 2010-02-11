@@ -1,7 +1,7 @@
 package org.w3.swap.rdfa
 
 import org.w3.swap
-import swap.rdfgraph.RDFGraph
+import swap.rdf.RDFGraphParts
 import swap.uri.Util.combine
 import swap.rdf.Vocabulary
 
@@ -216,7 +216,7 @@ abstract class RDFaSyntax extends CURIE {
  * only the RDFa-specific notion.
  */
 
-trait CURIE extends RDFGraph {
+trait CURIE extends RDFGraphParts {
   import scala.util.matching.Regex
 
   def fresh(hint: String): BlankNode

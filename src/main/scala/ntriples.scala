@@ -4,7 +4,7 @@ package org.w3.swap.ntriples
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
 import org.w3.swap
-import swap.rdfgraph.RDFGraph
+import swap.rdf.RDFGraphParts
 
 /**
  * Parser for N-Triples, a simple line-oriented RDF format.
@@ -58,7 +58,7 @@ abstract class NTriplesSyntax extends NTriplesTerms {
   def eoln: Parser[String] = """\r|\n|(?:\r\n)""".r
 }
 
-abstract class NTriplesTerms extends RegexParsers with RDFGraph {
+abstract class NTriplesTerms extends RegexParsers with RDFGraphParts {
 
   def blankNode(id: String): BlankNode
 

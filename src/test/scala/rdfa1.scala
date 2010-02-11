@@ -4,17 +4,9 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 import org.w3.swap
-import swap.rdflogic.{TermNode, Name}
-import swap.rdfa
-import swap.rdfxml
-
-object RDFaParser extends rdfa.RDFaSyntax with TermNode {
-  type BlankNode = rdfxml.XMLVar
-
-  lazy val vars = new rdfxml.Scope()
-  def fresh(hint: String) = vars.fresh(hint)
-  def byName(name: String) = vars.byName(name)
-}
+import swap.webdata.RDFaParser
+import swap.rdflogic.Name
+import swap.rdfxml.XMLVar
 
 class RDFaMisc extends Spec with ShouldMatchers {
 
@@ -32,7 +24,7 @@ class RDFaMisc extends Spec with ShouldMatchers {
       val undef = RDFaParser.undef
       var arcs = RDFaParser.walk(e1, addr, Name(addr), undef, Nil, Nil, null)
       (arcs.force.head match {
-	case (Name(_), Name(_), rdfxml.XMLVar(_, _)) => true
+	case (Name(_), Name(_), XMLVar(_, _)) => true
 	case _ => false
       }) should equal (true)
     }

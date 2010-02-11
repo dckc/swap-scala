@@ -1,12 +1,11 @@
 package org.w3.swap.rdflogic
 
 import org.w3.swap
-import swap.rdfgraph.RDFGraph
+import swap.rdf.RDFGraphParts
 import swap.logic0.Formula
 import swap.logic1.{Term, FunctionTerm, Variable}
 import Term.Subst
 import swap.logic1ec.{Exists, And, Atomic, ECLogic}
-import ECLogic.variables
 
 /**
  * RDF has only ground, 0-ary function terms.
@@ -27,7 +26,7 @@ case class XMLLit(content: scala.xml.NodeSeq) extends Ground
 /**
  * Implement RDF Nodes (except BlankNode) using FOL function terms
  */
-trait TermNode extends RDFGraph {
+trait TermNode extends RDFGraphParts {
   type Node = Term
   type SubjectNode = Term
   type Label = Name
@@ -40,7 +39,7 @@ trait TermNode extends RDFGraph {
   def xmllit(e: scala.xml.NodeSeq): Literal = XMLLit(e)
 }
 
-object F extends TermNode {
+object RDFLogic extends ECLogic with TermNode {
   import swap.rdf.Vocabulary
   val nilterm = Name(Vocabulary.nil)
 

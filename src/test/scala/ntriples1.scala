@@ -4,30 +4,25 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 import org.w3.swap
-import swap.ntriples.NTriplesSyntax
+import swap.webdata.NTriplesParser
 import swap.logic1.Term
 import swap.rdfxml
+import rdfxml.XMLVar
 import swap.rdflogic.{Name, Plain, Data, XMLLit, TermNode }
-import swap.rdfgraph.RDFGraph
 import swap.sexp.{SExp, Cons, Atom}
 import SExp.fromSeq
 
 
-class TestParser extends NTriplesSyntax with TermNode {
-  type BlankNode = swap.rdfxml.XMLVar
-
-  val scope = new rdfxml.Scope()
-  def blankNode(n: String) = scope.byName(n)
-
-  def arcs() = Nil // don't need it for testing.
-
+class TestParser extends NTriplesParser {
   def test(doc: String): SExp = {
     parseAll(ntripleDoc, doc) match {
-      case Success(arcs, _) =>
-	fromSeq(Atom('and) :: arcs.toList.map {
-	  case (s, p, o) => fromSeq(List('holds,
-					 List(p, s, o).map(TQ.quote)))
-	})
+      case Success(arcs, _) => {
+	val exprs: List[SExp] = arcs.toList.map {
+	  case (s, p, o) =>
+	    fromSeq(List('holds, List(p, s, o).map(TQ.quote)))
+	}
+	fromSeq(Atom('and) :: exprs)
+      }
 
       case Failure(_, rest) => fromSeq(List('failure,
 					    Atom(rest.pos.longString)))
@@ -52,7 +47,7 @@ object TQ {
 
   def quote(term: Term): SExp = {
     term match {
-      case v: rdfxml.XMLVar => v.sym
+      case v: XMLVar => v.sym
       case Name(n) => fromSeq(List(Symbol(n)))
       case Plain(s, None) => Atom(s)
       case Plain(s, Some(code)) => fromSeq(List('text, Atom(s), Atom(code)))
@@ -86,11 +81,12 @@ _:somewhere <data:in> <data:Texas> .
     }
 
     it("should work with SimpleSerializer") {
-      val p = new TestParser()
+      val p = new NTriplesParser()
 
       // TODO: use stringwriter; check output
       val wr = new java.io.StringWriter()
-      rdfxml.SimpleSerializer.writeArcsDoc(wr, p.arcs(doc))
+      val arcs = p.arcs(p.parseAll(p.ntripleDoc, doc))
+      rdfxml.SimpleSerializer.writeArcsDoc(wr, arcs)
       wr.close()
       wr.toString() should equal (
 	"""<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">

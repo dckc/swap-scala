@@ -14,7 +14,7 @@ case class Exists(vars: Set[Variable], g: Formula) extends Formula
 /**
  * Existential Conjunctive Logic
  */
-object ECLogic extends PropositionalCalculus {
+class ECLogic extends PropositionalCalculus {
   import Term.Subst
 
   def terms(f: Formula): Seq[Term] = {

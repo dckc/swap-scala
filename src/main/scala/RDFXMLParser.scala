@@ -1,25 +1,25 @@
-package org.w3.swap.rdf
+package org.w3.swap.rdfxml
 
-import Vocabulary.nsuri
-import AbstractSyntax.rdf_type
 import org.w3.swap
+import swap.rdf.Vocabulary
+import swap.rdf.RDFGraphParts
 import swap.uri.Util.combine
 
 import scala.xml.{Elem, NodeSeq, Node, PrefixedAttribute}
 
-object XMLtoRDF {
+abstract class XMLtoRDF extends RDFGraphParts {
   import Vocabulary.nsuri
-  import org.w3.swap.logic.{Formula, Exists, And, Term}
-  import AbstractSyntax.{plain, data, text, xml}
+  val rdf_type = uri(Vocabulary.`type`)
 
-  def getArcs(e: Elem, base: String): Stream[Holds] = {
-    val vars = new XMLNameScope()
+  def fresh(hint: String): BlankNode
+  def byName(name: String): BlankNode
 
+  def getArcs(e: Elem, base: String): Stream[Arc] = {
     e match {
       case <RDF>{children @ _*}</RDF> if (e.namespace == nsuri) => {
 	children.toStream.flatMap {
 	  case ne: Elem => {
-	    val (t, arcs) = walkNodeElement(ne, base, vars)
+	    val (t, arcs) = walkNodeElement(ne, base)
 	    arcs
 	  }
 
@@ -28,13 +28,13 @@ object XMLtoRDF {
 	}
       }
       case _ => {
-	val (t, arcs) = walkNodeElement(e, base, vars)
+	val (t, arcs) = walkNodeElement(e, base)
 	arcs
       }
     }
   }
 
-  private def euri(e: Elem) = URI(e.namespace + e.label)
+  private def euri(e: Elem) = uri(e.namespace + e.label)
   private final val attr_ID = "@{" + nsuri + "}ID"
   private final val attr_about = "@{" + nsuri + "}about"
   private final val attr_resource = "@{" + nsuri + "}resource"
@@ -43,40 +43,39 @@ object XMLtoRDF {
   private final val attr_datatype = "@{" + nsuri + "}datatype"
   private final val attr_lang = "@{http://www.w3.org/XML/1998/namespace}lang"
 
-  def walkNodeElement(ne: Elem, base: String,
-		       vars: XMLNameScope): (Term, Stream[Holds]) = {
+  def walkNodeElement(ne: Elem, base: String): (SubjectNode, Stream[Arc]) = {
     val about = ne \ attr_about
     val id = ne \ attr_ID
     val nodeID = ne \ attr_nodeID
     val subject = {
-      if (about.length > 0) URI(combine(base, about.text))
-      else if (id.length > 0) URI(combine(base, "#" + id.text))
-      else if (nodeID.length > 0) vars.byName(nodeID.text)
-      else vars.fresh("it")
+      if (about.length > 0) uri(combine(base, about.text))
+      else if (id.length > 0) uri(combine(base, "#" + id.text))
+      else if (nodeID.length > 0) byName(nodeID.text)
+      else fresh("it")
     }
     
     val arcs1 = ne match {
       case <Description>{children @_*}</Description> if (ne.namespace == nsuri)
-	=> walkProperties(subject, children, base, vars)
+	=> walkProperties(subject, children, base)
       case _ => {
-	Stream.cons(Holds(subject, rdf_type, euri(ne)),
-		    walkProperties(subject, ne.child, base, vars))
+	Stream.cons((subject, rdf_type, euri(ne)),
+		    walkProperties(subject, ne.child, base))
       }
     }
 
     val arcs2 = ne.attributes.toStream.flatMap {
       case PrefixedAttribute(ns, local, value, _) 
       if ne.getNamespace(ns) != nsuri =>
-	Stream(Holds(subject, URI(ne.getNamespace(ns) + local),
-		     plain(value.text)))
+	Stream((subject, uri(ne.getNamespace(ns) + local),
+		plain(value.text, None)))
       case _ => Stream.empty // never mind. perhaps check for errors.
     }
 
     (subject, arcs1 ++ arcs2)
   }
 
-  def walkProperties(subject: Term, children: NodeSeq, base: String,
-		      vars: XMLNameScope): Stream[Holds] = {
+  def walkProperties(subject: SubjectNode, children: NodeSeq,
+		     base: String): Stream[Arc] = {
     children.toStream.flatMap {
       case e: Elem => {
 	val res = e \ attr_resource
@@ -87,27 +86,28 @@ object XMLtoRDF {
 	val elems = e.child partialMap { case c: Elem => c }
 
 	if(pt.text == "" && elems.length == 1) {
-	  val (obj, arcs) = walkNodeElement(elems(0), base, vars)
-	  Stream.cons(Holds(subject, euri(e), obj), arcs)
+	  val (obj, arcs) = walkNodeElement(elems(0), base)
+	  Stream.cons((subject, euri(e), obj), arcs)
 	} else {
 	  val obj = (pt.text, elems.length) match {
 	    case ("Resource", _) => {
-	      val r = vars.fresh("it")
-	      walkProperties(r, e.child, base, vars)
+	      val r = fresh("it")
+	      walkProperties(r, e.child, base)
 	      r
 	    }
-	    case ("Literal", _) => xml(e.child)
-	    case ("Collection", _) => plain("@@TODO: Collection")
-	    case ("", 0) if !res.isEmpty => URI(combine(base, res.text))
-	    case ("", 0) if !nid.isEmpty => vars.byName(nid.text)
+	    case ("Literal", _) => xmllit(e.child)
+	    case ("Collection", _) => plain("@@TODO: Collection", None)
+	    case ("", 0) if !res.isEmpty => uri(combine(base, res.text))
+	    case ("", 0) if !nid.isEmpty => byName(nid.text)
 	    case ("", 0) if !dt.isEmpty =>
-	      data(e.text, URI(combine(base, dt.text)))
-	    case ("", 0) if !lang.isEmpty => text(e.text, Symbol(lang.text))
-	    case ("", 0) => plain(e.text)
+	      typed(e.text, combine(base, dt.text))
+	    case ("", 0) if !lang.isEmpty =>
+	      plain(e.text, Some(Symbol(lang.text.toLowerCase)))
+	    case ("", 0) => plain(e.text, None)
 	    case _ => 
 	      throw new Exception("@@bad object syntax")
 	  }
-	  Stream(Holds(subject, euri(e), obj))
+	  Stream((subject, euri(e), obj))
 	}
 
 	/* TODO: 2.12 Omitting Nodes: Property Attributes on an
