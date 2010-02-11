@@ -2,8 +2,9 @@ package org.w3.swap.logic1c
 
 import org.w3.swap
 import swap.logic0.{Formula, Or, Not, Appeal}
-import swap.logic1.{Equal, Term, FunctionTerm, Variable, FirstOrderLogic}
-import swap.logic1.Term.Subst
+import swap.logic1.{Term, FunctionTerm, Variable}
+import Term.Subst
+import swap.logic1eq.{Equal, FOLeq }
 import swap.sexp.{SExp, Atom, Cons}
 import swap.sexp.SExp.{fromSeq}
 
@@ -11,7 +12,7 @@ import swap.sexp.SExp.{fromSeq}
  * First order logic with equality, quoting, eval, and induction,
  * following ACL2/Milawa.
  */
-abstract class ComputationalLogic extends FirstOrderLogic {
+abstract class ComputationalLogic extends FOLeq {
 
   def quote(f: Formula): SExp = {
     f match {

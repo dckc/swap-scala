@@ -1,8 +1,9 @@
-package org.w3.swap.rdf
+package org.w3.swap.rdfa
 
 import org.w3.swap
-import swap.logic.{Formula, And, Exists, Term}
+import swap.rdfgraph.RDFGraph
 import swap.uri.Util.combine
+import swap.rdf.Vocabulary
 
 import scala.xml
 
@@ -15,20 +16,12 @@ import scala.xml
  * W3C Recommendation 14 October 2008
  *
  */
-object RDFaSyntax{
-  // TODO: consider making rdf.AbstractSyntax an interface/trait...
-  import AbstractSyntax.{plain, text, data, rdf_type, xml => xmllit }
+abstract class RDFaSyntax extends CURIE {
+  val rdf_type = uri(Vocabulary.`type`)
+  val undef = fresh("undef") // null seems to cause type mismatch errors
 
-  def getFormula(e: xml.Elem, base: String): Formula = {
-    val f1 = And(getArcs(e, base).iterator.toSeq)
-    val vars = f1.variables()
-    if (vars.isEmpty) f1
-    else Exists(vars, f1)
-  }
-
-  // TODO: rename Holds to Arc? just use scala tuple here?
-  def getArcs(e: xml.Elem, base: String): Stream[Holds] = {
-    walk(e, base, new XMLNameScope(), URI(base), null, Nil, Nil, null)
+  def getArcs(e: xml.Elem, base: String): Stream[Arc] = {
+    walk(e, base, uri(base), undef, Nil, Nil, null)
   }
 
   /**
@@ -47,11 +40,11 @@ object RDFaSyntax{
    * @param lang1: [language] from step 1
    *
    */
-  def walk(e: xml.Elem, base: String, vars: XMLNameScope,
-	   subj1: Term, obj1: Term,
-	   pending1f: Iterable[Term], pending1r: Iterable[Term],
-	   lang1: Symbol): Stream[Holds] = {
-    assert(subj1 != null) // with NotNull doesn't seem to work. scalaq?
+  def walk(e: xml.Elem, base: String,
+	   subj1: SubjectNode, obj1: SubjectNode,
+	   pending1f: Iterable[Label], pending1r: Iterable[Label],
+	   lang1: Symbol): Stream[Arc] = {
+    assert(subj1 != undef) // with NotNull doesn't seem to work. scalaq?
 
     // step 2., URI mappings, is taken care of by scala.xml
 
@@ -64,19 +57,19 @@ object RDFaSyntax{
     }
 
     // steps 4 and 5, refactored
-    val relterms = CURIE.refN(e, "@rel", true)
-    val revterms = CURIE.refN(e, "@rev", true)
-    val types = CURIE.refN(e, "@typeof", false)
-    val props = CURIE.refN(e, "@property", false)
-    val (subj45, objref5, skip) = subjectObject(obj1, e, base, vars,
+    val relterms = refN(e, "@rel", true)
+    val revterms = refN(e, "@rev", true)
+    val types = refN(e, "@typeof", false)
+    val props = refN(e, "@property", false)
+    val (subj45, objref5, skip) = subjectObject(obj1, e, base,
 						(e \ "@rel").isEmpty &&
 						(e \ "@rev").isEmpty,
 						types, props)
 
     // step 6. typeof
     val arcs6 = {
-      if (subj45 != null)
-	types.toStream.map(cls => Holds(subj45, rdf_type, cls))
+      if (subj45 != undef)
+	types.toStream.map(cls => (subj45, rdf_type, cls))
       else Stream.empty
     }
 
@@ -84,16 +77,16 @@ object RDFaSyntax{
     // HTML grammar guarantees a subject at this point, I think,
     // but in an effort to stay host-language-neutral, let's double-check
     val arcs7 = {
-      if (objref5 != null && subj45 != null) {
-	(for (p <- relterms.toStream) yield Holds(subj45, p, objref5)) ++
-	(for (p <- revterms.toStream) yield Holds(objref5, p, subj45))
+      if (objref5 != undef && subj45 != undef) {
+	(for (p <- relterms.toStream) yield (subj45, p, objref5)) ++
+	(for (p <- revterms.toStream) yield (objref5, p, subj45))
       } else Stream.empty
     }
 
     // step 8 incomplete triples.
     val (objref8, pending8f, pending8r) = {
-      if (objref5 == null && !(relterms.isEmpty && revterms.isEmpty))
-	(vars.fresh("x8"), relterms, revterms)
+      if (objref5 == undef && !(relterms.isEmpty && revterms.isEmpty))
+	(fresh("x8"), relterms, revterms)
       else (objref5, Nil, Nil)
     }
 
@@ -104,21 +97,21 @@ object RDFaSyntax{
     }
 
     // step 10 complete incomplete triples.
-    val arcs10: Stream[Holds] = if (!skip && subj45 != null) {
-      pending1f.toStream.map(Holds(subj1, _, subj45)) ++
-      pending1r.toStream.map(Holds(subj45, _, subj1))
+    val arcs10: Stream[Arc] = if (!skip && subj45 != undef) {
+      pending1f.toStream.map((subj1, _, subj45)) ++
+      pending1r.toStream.map((subj45, _, subj1))
     } else Stream.empty
 
     // step 11. recur
     arcs6 ++ arcs7 ++ arcs9 ++ arcs10 ++ (if (!xmlobj) {
       e.child.toStream.flatMap {
 	case c: xml.Elem => {
-	  if (skip) walk(c, base, vars, subj1, obj1,
+	  if (skip) walk(c, base, subj1, obj1,
 			 pending1f, pending1r, lang)
-	  else walk(c, base, vars,
-		    if (subj45 != null) subj45 else subj1,
-		    (if (objref8 != null) objref8
-		     else if (subj45 != null) subj45
+	  else walk(c, base,
+		    if (subj45 != undef) subj45 else subj1,
+		    (if (objref8 != undef) objref8
+		     else if (subj45 != undef) subj45
 		     else subj1),
 		    pending8f, pending8r, lang)
 	}
@@ -131,33 +124,33 @@ object RDFaSyntax{
    * steps 4 and 5, refactored
    * @return: new subject, new object ref, skip flag
    */
-  def subjectObject(obj1: Term, e: xml.Elem, base: String, vars: XMLNameScope,
+  def subjectObject(obj1: SubjectNode, e: xml.Elem, base: String,
 		    norel: Boolean,
-		    types: Iterable[URI], props: Iterable[URI]
-		  ): (Term, Term, Boolean) = {
-    val about = CURIE.ref1(e, "@about", base, vars)
+		    types: Iterable[Label], props: Iterable[Label]
+		  ): (SubjectNode, SubjectNode, Boolean) = {
+    val about = ref1(e, "@about", base)
     lazy val src = e \ "@src"
-    lazy val resource = CURIE.ref1(e, "@resource", base, vars)
+    lazy val resource = ref1(e, "@resource", base)
     lazy val href = e \ "@href"
 
     val subj45x = {
       if (!about.isEmpty) about.get
-      else if (!src.isEmpty) URI(combine(base, src.text))
+      else if (!src.isEmpty) uri(combine(base, src.text))
       else if (norel && !resource.isEmpty) resource.get
-      else if (norel && !href.isEmpty) URI(combine(base, href.text))
+      else if (norel && !href.isEmpty) uri(combine(base, href.text))
       // hmm... host language creeping in here...
-      else if (e.label == "head" || e.label == "body") URI(combine(base, ""))
-      else if (!types.isEmpty) vars.fresh("x4")
-      else null
+      else if (e.label == "head" || e.label == "body") uri(combine(base, ""))
+      else if (!types.isEmpty) fresh("x4")
+      else undef
     }
 
     val objref5 = (if (!resource.isEmpty) resource.get
-		   else if (!href.isEmpty) URI(combine(base, href.text))
-		   else null
+		   else if (!href.isEmpty) uri(combine(base, href.text))
+		   else undef
 		 )
 
-    val subj45 = if (subj45x != null) subj45x else obj1
-    val skip = norel && (subj45x == null) && props.isEmpty
+    val subj45 = if (subj45x != undef) subj45x else obj1
+    val skip = norel && (subj45x == undef) && props.isEmpty
 
     return (subj45, objref5, skip)
   }
@@ -167,21 +160,24 @@ object RDFaSyntax{
    * side effect: pushes statements
    * @return: (arcs, xmllit) where xmllit is true iff object is XMLLiteral
    */
-  def literalObject(subj: Term, props: Iterable[URI], lang: Symbol,
-		    e: xml.Elem): (Stream[Holds], Boolean) = {
+  def literalObject(subj: SubjectNode, props: Iterable[Label], lang: Symbol,
+		    e: xml.Elem): (Stream[Arc], Boolean) = {
     val content = e \ "@content"
     val datatype = e \ "@datatype"
 
     lazy val lex = if(!content.isEmpty) content.text else e.text
 
-    def txt(s: String) = if (lang == null) plain(s) else text(s, lang)
+    def txt(s: String) = (
+      if (lang == null) plain(s, None)
+      else plain(s, Some(lang))
+    )
 
     lazy val alltext = e.child.forall {
       case t: xml.Text => true; case _ => false
     }
 
-    def sayit(obj: Term) = {
-      for(p <- props.toStream) yield Holds(subj, p, obj)
+    def sayit(obj: Node) = {
+      for(p <- props.toStream) yield (subj, p, obj)
     }
 
     (!datatype.isEmpty, !content.isEmpty) match {
@@ -189,12 +185,12 @@ object RDFaSyntax{
 
       case (true, _) => {
 	datatype.text match {
-	  case CURIE.parts(p, l) if p != null => {
+	  case parts(p, l) if p != null => {
 	    try {
-	      val dt = CURIE.expand(p, l, e)
+	      val dt = expand(p, l, e)
 
 	      if (dt == Vocabulary.XMLLiteral) (sayit(xmllit(e.child)), true)
-	      else (sayit(data(lex, URI(dt))), false)
+	      else (sayit(typed(lex, dt)), false)
 	    } catch {
 	      case e: NotDefinedError => (Stream.empty, false)
 	    }
@@ -220,8 +216,11 @@ object RDFaSyntax{
  * only the RDFa-specific notion.
  */
 
-object CURIE {
+trait CURIE extends RDFGraph {
   import scala.util.matching.Regex
+
+  def fresh(hint: String): BlankNode
+  def byName(name: String): BlankNode
 
   /*
    * spec says
@@ -238,18 +237,17 @@ object CURIE {
    * expand one safe curie or URI reference
    *
    */
-  def ref1(e: xml.Elem, attr: String, base: String,
-	   vars: XMLNameScope): Option[Term] = {
+  def ref1(e: xml.Elem, attr: String, base: String): Option[SubjectNode] = {
     val attrval = e \ attr
     if (attrval.isEmpty) None
     else attrval.text match {
       case parts2(p, _) if p == null => None
-      case parts2("_", "") => Some(vars.byName("_"))
+      case parts2("_", "") => Some(byName("_"))
       // TODO: encode arbitrary strings as XML names
-      case parts2("_", l) if l.startsWith("_") => Some(vars.byName(l))
-      case parts2("_", l) => Some(vars.byName(l))
-      case parts2(p, l) => Some(URI(expand(p, l, e)))
-      case ref => Some(URI(combine(base, ref)))
+      case parts2("_", l) if l.startsWith("_") => Some(byName(l))
+      case parts2("_", l) => Some(byName(l))
+      case parts2(p, l) => Some(uri(expand(p, l, e)))
+      case ref => Some(uri(combine(base, ref)))
     }
   }
 
@@ -281,19 +279,19 @@ object CURIE {
 		       "up")
   final val xhv = "http://www.w3.org/1999/xhtml/vocab#"
 
-  def refN(e: xml.Elem, attr: String, bare: Boolean): Iterable[URI] = {
+  def refN(e: xml.Elem, attr: String, bare: Boolean): Iterable[Label] = {
     "\\s+".r.split((e \ attr).text) flatMap {
       case token if (bare && reserved.contains(token.toLowerCase)) =>
-	List(URI(xhv + token.toLowerCase))
+	List(uri(xhv + token.toLowerCase))
 
-      case CURIE.parts(p, l) if (p == null) => Nil // foo
+      case parts(p, l) if (p == null) => Nil // foo
 
-      case CURIE.parts(p, l) if (p == "_") => Nil // _:foo
+      case parts(p, l) if (p == "_") => Nil // _:foo
 
-      case CURIE.parts(p, l) if (p == "xml") => Nil // xml:foo
+      case parts(p, l) if (p == "xml") => Nil // xml:foo
 
-      case CURIE.parts(p, l) =>	try {
-	List(URI(CURIE.expand(p, l, e)))
+      case parts(p, l) =>	try {
+	List(uri(expand(p, l, e)))
       } catch {
 	case e: NotDefinedError => Nil
       }

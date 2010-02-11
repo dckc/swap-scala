@@ -6,7 +6,7 @@ import org.scalatest.matchers.ShouldMatchers
 import org.w3.swap
 import swap.sexp
 import swap.logic0.{Or, Not, Appeal}
-import swap.logic1.{Equal}
+import swap.logic1eq.{Equal}
 import swap.logic1c.{Var, History}
 
 class PfCheck1 extends Spec with ShouldMatchers {

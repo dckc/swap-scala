@@ -1,12 +1,23 @@
 package org.w3.swap.test
 
 import org.w3.swap
+import swap.rdfa.{CURIE => CURIEx}
+import swap.logic1.Variable
+import swap.rdflogic.TermNode
+import swap.rdfxml
 
 import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
-class CURIE1 extends Spec with ShouldMatchers {
-  import swap.rdf.{URI, CURIE}
+object CURIE extends CURIEx with TermNode {
+  type BlankNode = Variable
+
+  val vars = new rdfxml.Scope()
+  def fresh(hint: String) = vars.fresh(hint)
+  def byName(name: String) = vars.byName(name)
+}
+
+class CURIE1misc extends Spec with ShouldMatchers {
 
   describe("CURIE handler") {
 
@@ -23,7 +34,7 @@ class CURIE1 extends Spec with ShouldMatchers {
       //val base = "data:"
 
       CURIE.refN(e1, "@rel", true) should equal (
-	List(URI(CURIE.xhv + "next"))
+	List(CURIE.uri(CURIE.xhv + "next"))
       )
     }
 
@@ -31,7 +42,7 @@ class CURIE1 extends Spec with ShouldMatchers {
       val e2 = <link rel=":next" href="data:0064.xhtml" />
 
       CURIE.refN(e2, "@rel", true) should equal (
-	List(URI(CURIE.xhv + "next"))
+	List(CURIE.uri(CURIE.xhv + "next"))
       )
     }
 
@@ -45,17 +56,17 @@ class CURIE1 extends Spec with ShouldMatchers {
     it("should normalize case of link types") {
       val elt = <a rel="NEXT" href="ben.html">Ben</a>
       CURIE.refN(elt, "@rel", true) should equal (
-	List(URI(CURIE.xhv + "next"))
+	List(CURIE.uri(CURIE.xhv + "next"))
       )
 
       val elt2 = <a rel="NeXT" href="ben.html">Ben</a>
       CURIE.refN(elt2, "@rel", true) should equal (
-	List(URI(CURIE.xhv + "next"))
+	List(CURIE.uri(CURIE.xhv + "next"))
       )
 
       val elt3 = <a rel="neXt" href="ben.html">Ben</a>
       CURIE.refN(elt3, "@rel", true) should equal (
-	List(URI(CURIE.xhv + "next"))
+	List(CURIE.uri(CURIE.xhv + "next"))
       )
     }
 
