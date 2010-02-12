@@ -1,11 +1,10 @@
 package org.w3.swap.rdflogic
 
 import org.w3.swap
-import swap.rdf.RDFGraphParts
-import swap.logic0.Formula
+import swap.rdf.RDFNodeBuilder
 import swap.logic1.{Term, FunctionTerm, Variable}
 import Term.Subst
-import swap.logic1ec.{Exists, And, Atomic, ECLogic}
+import swap.logic1ec.{Exists, And, Atomic, ECProver, ECFormula}
 
 /**
  * RDF has only ground, 0-ary function terms.
@@ -26,7 +25,7 @@ case class XMLLit(content: scala.xml.NodeSeq) extends Ground
 /**
  * Implement RDF Nodes (except BlankNode) using FOL function terms
  */
-trait TermNode extends RDFGraphParts {
+trait TermNode extends RDFNodeBuilder {
   type Node = Term
   type SubjectNode = Term
   type Label = Name
@@ -39,15 +38,28 @@ trait TermNode extends RDFGraphParts {
   def xmllit(e: scala.xml.NodeSeq): Literal = XMLLit(e)
 }
 
-object RDFLogic extends ECLogic with TermNode {
+object RDFLogic extends ECProver with RDFXMLTerms {
   import swap.rdf.Vocabulary
-  val nilterm = Name(Vocabulary.nil)
 
-  def graphFormula(arcs: Iterable[Arc]): Formula = {
-    val atoms = arcs.toSeq.map {
-      case (s, p, o) => Atomic('holds, List(s, p, o))
+  def scope(taken: Iterable[Variable]): (Variable => Variable) = {
+    val vars = new Scope()
+    return {
+      case v: XMLVar => vars.fresh(v.sym.name)
+      case _ => vars.fresh("x")
     }
+  }
+
+  def atom(s: Term, p: Term, o: Term): Atomic = {
+    Atomic('holds, List(s, p, o))
+  }
+  def atom(arc: (Term, Term, Term)): Atomic = {
+    Atomic('holds, List(arc._1, arc._2, arc._3))
+  }
+
+  def graphFormula(arcs: Iterable[Arc]): ECFormula = {
+    val atoms = arcs.toSeq.map { case (s, p, o) => atom(s, p, o) }
     val g = And(atoms)
-    Exists(variables(g), g)
+    val vars = variables(g)
+    if (vars.isEmpty) g else Exists(vars, g)
   }
 }

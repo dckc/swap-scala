@@ -1,7 +1,7 @@
 package org.w3.swap.rdfa
 
 import org.w3.swap
-import swap.rdf.RDFGraphParts
+import swap.rdfxml.RDFXMLNodeBuilder
 import swap.uri.Util.combine
 import swap.rdf.Vocabulary
 
@@ -17,7 +17,6 @@ import scala.xml
  *
  */
 abstract class RDFaSyntax extends CURIE {
-  val rdf_type = uri(Vocabulary.`type`)
   val undef = fresh("undef") // null seems to cause type mismatch errors
 
   def getArcs(e: xml.Elem, base: String): Stream[Arc] = {
@@ -216,11 +215,8 @@ abstract class RDFaSyntax extends CURIE {
  * only the RDFa-specific notion.
  */
 
-trait CURIE extends RDFGraphParts {
+trait CURIE extends RDFXMLNodeBuilder {
   import scala.util.matching.Regex
-
-  def fresh(hint: String): BlankNode
-  def byName(name: String): BlankNode
 
   /*
    * spec says

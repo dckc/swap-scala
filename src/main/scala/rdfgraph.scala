@@ -24,11 +24,21 @@ trait RDFGraphParts {
   type SubjectNode <: Node
   type BlankNode <: SubjectNode
   type Label <: SubjectNode
+  type LanguageTag = Symbol
 
-  //def arcs(): Iterable[Arc]
+}
+
+/**
+ * No concrete method for building blankNodes, as it
+ * depends on the concrete syntax.
+ */
+trait RDFNodeBuilder extends RDFGraphParts {
+  val rdf_type = uri(Vocabulary.`type`)
+  val rdf_nil = uri(Vocabulary.nil)
+  val rdf_first = uri(Vocabulary.first)
+  val rdf_rest = uri(Vocabulary.rest)
 
   def uri(i: String): Label
-  type LanguageTag = Symbol
   def plain(s: String, lang: Option[LanguageTag]): Literal
   def typed(s: String, dt: String): Literal
   def xmllit(content: scala.xml.NodeSeq): Literal

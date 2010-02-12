@@ -1,13 +1,15 @@
 package org.w3.swap.test
 
 import org.w3.swap
-import swap.logic.{Formula, Exists, And, Atomic, Term, Literal}
-import swap.rdf.{URI, BlankNode, Graph, Holds}
-import swap.WebData
+import swap.webdata.WebData
+import swap.logic1.Term
+import swap.logic1ec.ECFormula
+import swap.rdflogic.{RDFXMLTerms, Name, Plain}
+import swap.webdata.Graph
 
 abstract class Namespace(n: String) {
-  protected def term(name: String): URI = {
-    URI(n + name)
+  protected def term(name: String): Name = {
+    Name(n + name)
   }
 }
 
@@ -54,14 +56,14 @@ case class RunResult(pass: Boolean) extends TestResult
 case class BadTestData(msg: String) extends TestResult
 case class UnsupportedFeature(msg: String) extends TestResult
 
-abstract class TestSuite(val manifest: Graph) {
+abstract class TestSuite(val manifest: Graph) extends RDFXMLTerms {
   def run(): Stream[(Term, String, TestResult)]
 }
 
 class EntailmentTestSuite(override val manifest: Graph)
 extends TestSuite(manifest) {
-  import swap.rdf.AbstractSyntax.{conjunction, wellformed, rdf_type, plain }
-  import swap.rdf.Semantics.entails
+  import swap.logic1ec.And
+  import swap.rdflogic.{RDFLogic => RL }
 
   val what = manifest.qvar
   val what2 = manifest.vars.fresh("what")
@@ -72,9 +74,9 @@ extends TestSuite(manifest) {
 					     what2)
     } yield {
       o match {
-	case Literal(desc: String) => {
+	case Plain(desc, _) => {
 	  if (!manifest.contains(test, testSchema.status,
-				 Literal("APPROVED")))
+				 Plain("APPROVED", None)))
  	    (test, desc, BadTestData("test not APPROVED"))
 	  else manifest.any(test, rdf_type, what) match {
 	    case testSchema.PositiveEntailmentTest => {
@@ -103,7 +105,7 @@ extends TestSuite(manifest) {
 
     rules.forall {
       case testSchema.simpleEntailment => true
-      case URI(i) => i == nsuri
+      case Name(i) => i == nsuri
       case _ => false
     }
   }
@@ -114,8 +116,8 @@ extends TestSuite(manifest) {
     else {
       val premises = manifest.each(test, testSchema.premiseDocument, what
 				 ).map(t => load(t))
-      val premise = premises.foldLeft(And(Nil):Formula)(
-	(f, g) => conjunction(f, g))
+      val premise = premises.foldLeft(And(Nil):ECFormula)(
+	(f, g) => RL.conjunction(f, g))
 
       val conclusion = load(manifest.any(test, testSchema.conclusionDocument,
 					 what))
@@ -125,7 +127,7 @@ extends TestSuite(manifest) {
       println("entails?" + expected)
       println("conclusion: " + conclusion)
 
-      RunResult(entails(premise, conclusion) == expected)
+      RunResult(RL.entails(premise, conclusion) == expected)
     }
   }
 
@@ -133,12 +135,12 @@ extends TestSuite(manifest) {
     val fin = load(manifest.any(test, testSchema.inputDocument, what))
     val fout = load(manifest.any(test, testSchema.outputDocument, what))
 
-    RunResult(entails(fin, fout) && entails(fout, fin))
+    RunResult(RL.entails(fin, fout) && RL.entails(fout, fin))
   }
 
-  def load(u: Term): Formula = {
-    u match {
-      case URI(addr) => {
+  def load(u: Term): ECFormula = {
+    val arcs = u match {
+      case Name(addr) => {
 	if (manifest.contains(u, rdf_type,
 			      testSchema.`RDF-XML-Document`) ) {
 	  WebData.loadRDFXML(addr)
@@ -148,21 +150,22 @@ extends TestSuite(manifest) {
 	  println("@@unknown document type:  for test document " + u)
 	  println(manifest.each(u, rdf_type, what).mkString("types:",
 							      "\n ", "\n"))
-	  And(Nil) // or use Forall(), i.e. non-RDF?
+	  Stream.empty
 	}
       }
       case _ => {
 	println("@@document term not a URI: " + u)
 	println("@@TODO FalseDocument support.")
-	And(Nil)
+	Stream.empty
       }
     }
+    RL.graphFormula(arcs)
   }
 }
 
+/* @@ need to restore SPARQL parser...
 class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
-  import swap.rdf.AbstractSyntax.{rdf_type}
-  import swap.rdf.Semantics.entails
+  import swap.rdflogic.{RDFLogic => RL}
 
   val what = manifest.qvar
   val what2 = manifest.vars.fresh("what")
@@ -179,19 +182,19 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 			  what)
     } yield {
       (title, indoc, outq) match {
-	case (Literal(titlestr: String), inaddr: URI, outaddr: URI) =>
+	case (Plain(titlestr, _), Name(inaddr), Name(outaddr)) =>
 	  if (!manifest.contains(test, testDescription.reviewStatus,
 				 testDescription.approved))
  	    (test, titlestr, BadTestData("test not approved"))
 	  else {
-	    val data = WebData.loadRDFa(inaddr.i)
-	    val pattern = WebData.loadSPARQL(outaddr.i)
+	    val data = RL.graphFormula(WebData.loadRDFa(inaddr))
+	    val pattern = RL.graphFormula(WebData.loadSPARQL(outaddr))
 
 	    if (pattern == null) {
 	      (test, titlestr, UnsupportedFeature("SPARQL parse failure"))
 	    } else {
 	      // TODO: handle expectedResults false
-	      val result = entails(data, pattern)
+	      val result = RL.entails(data, pattern)
 	      if (!result) {
 		println()
 		println("expected (from SPARQL):")
@@ -207,21 +210,24 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
     }
   }
 }
+*/
 
 class RDFaExample(indoc: String, outdoc: String) {
-  import swap.rdf.Semantics.entails
+  import swap.rdflogic.{RDFLogic => RL}
+  import swap.webdata.RDFQ
 
   def run(): Stream[(Term, String, TestResult)] = {
-    val base = WebData.asURI(indoc)
-    val actual = WebData.loadRDFa(base)
-    val expected = WebData.loadTurtle(WebData.asURI(outdoc), base)
-    val aTest = swap.rdf.BlankNode("test", Some(this.hashCode()))
+    val base = WebData.cwdbased(indoc)
+    val actual = RL.graphFormula(WebData.loadRDFa(base))
+    val expected = RL.graphFormula(
+      WebData.loadTurtle(WebData.cwdbased(outdoc), base))
+    val aTest = swap.rdflogic.XMLVar("test", Some(this.hashCode()))
 
-    val result = entails(actual, expected) && entails(expected, actual)
+    val result = RL.entails(actual, expected) && RL.entails(expected, actual)
 
     if(!result) {
-      println("expected: " + expected.quote().pretty())
-      println("actual: " + actual.quote().pretty())
+      println("expected: " + RDFQ.quote(expected).pretty())
+      println("actual: " + RDFQ.quote(actual).pretty())
     }
 
     Stream.cons((aTest, indoc, RunResult(result)),
@@ -235,7 +241,7 @@ object Runner {
 
     val results = args(0) match {
       case "--entailment" => new EntailmentTestSuite(manifest).run()
-      case "--rdfa" => new RDFaTestSuite(manifest).run()
+//@@      case "--rdfa" => new RDFaTestSuite(manifest).run()
       case "--rdfax" => new RDFaExample(args(1), args(2)).run()
       case _ => {
 	println("Usage: rdfstdtest --entailment|--rdfa manifest")

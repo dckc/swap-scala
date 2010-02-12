@@ -4,12 +4,11 @@ import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
 import org.w3.swap
-import swap.webdata.NTriplesParser
+import swap.webdata.{NTriplesParser, RDFQ}
 import swap.logic1.Term
 import swap.rdfxml
-import rdfxml.XMLVar
-import swap.rdflogic.{Name, Plain, Data, XMLLit, TermNode }
-import swap.sexp.{SExp, Cons, Atom}
+import swap.rdflogic.{Name, Plain, Data, XMLLit, TermNode, XMLVar }
+import swap.sexp.{SExp, Atom}
 import SExp.fromSeq
 
 
@@ -19,7 +18,7 @@ class TestParser extends NTriplesParser {
       case Success(arcs, _) => {
 	val exprs: List[SExp] = arcs.toList.map {
 	  case (s, p, o) =>
-	    fromSeq(List('holds, List(p, s, o).map(TQ.quote)))
+	    fromSeq(List('holds, List(p, s, o).map(RDFQ.quote)))
 	}
 	fromSeq(Atom('and) :: exprs)
       }
@@ -41,23 +40,6 @@ class TestParser extends NTriplesParser {
   }
 }
 
-
-object TQ {
-  implicit def sym(s: Symbol): Atom = Atom(s)
-
-  def quote(term: Term): SExp = {
-    term match {
-      case v: XMLVar => v.sym
-      case Name(n) => fromSeq(List(Symbol(n)))
-      case Plain(s, None) => Atom(s)
-      case Plain(s, Some(code)) => fromSeq(List('text, Atom(s), Atom(code)))
-      case Data(lex, dt) => fromSeq(List('data, Atom(lex), quote(dt)))
-      case XMLLit(content) => Atom(content.toString())
-      case _ => Atom(Symbol("*oops*"))
-    }
-  }
-
-}
 
 class NTriplesMisc extends Spec with ShouldMatchers {
   import org.w3.swap

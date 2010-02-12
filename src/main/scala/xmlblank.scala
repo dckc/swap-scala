@@ -1,4 +1,4 @@
-package org.w3.swap.rdfxml
+package org.w3.swap.rdflogic
 
 import org.w3.swap
 import swap.logic1.Variable
@@ -66,4 +66,16 @@ class Scope(val vars: Iterable[Variable]) {
     varstack.push(b)
     b
   }
+}
+
+/**
+ * Add concrete implementation of BlankNode
+ * as well as other RDFGraphParts from TermNode.
+ */
+trait RDFXMLTerms extends TermNode {
+  type BlankNode = XMLVar
+
+  lazy val vars = new Scope()
+  def fresh(hint: String) = vars.fresh(hint)
+  def byName(name: String) = vars.byName(name)
 }

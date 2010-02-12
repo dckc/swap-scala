@@ -1,16 +1,14 @@
 package org.w3.swap.rdfxml
 
-import org.w3.swap
-import swap.rdf.Vocabulary
-import swap.rdf.RDFGraphParts
-import swap.rdflogic.{TermNode, Name, Plain, Data, XMLLit}
-
 import scala.xml
 import scala.xml.{Elem, NamespaceBinding, TopScope}
 
-// TODO: provide abstract serializer without TermNode
-object SimpleSerializer extends TermNode {
-  type BlankNode = XMLVar
+import org.w3.swap
+import swap.rdf.Vocabulary
+import swap.rdflogic.{RDFXMLTerms, Name, Plain, Data, XMLLit, XMLVar}
+
+// TODO: provide abstract serializer without rdflogic
+object SimpleSerializer extends RDFXMLTerms {
 
   val rdfdecl = NamespaceBinding("rdf", Vocabulary.nsuri, TopScope)
 

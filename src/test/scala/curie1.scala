@@ -2,20 +2,12 @@ package org.w3.swap.test
 
 import org.w3.swap
 import swap.rdfa.{CURIE => CURIEx}
-import swap.logic1.Variable
-import swap.rdflogic.TermNode
-import swap.rdfxml
+import swap.rdflogic.{RDFXMLTerms}
 
 import org.scalatest.Spec
 import org.scalatest.matchers.ShouldMatchers
 
-object CURIE extends CURIEx with TermNode {
-  type BlankNode = Variable
-
-  val vars = new rdfxml.Scope()
-  def fresh(hint: String) = vars.fresh(hint)
-  def byName(name: String) = vars.byName(name)
-}
+object CURIE extends CURIEx with RDFXMLTerms
 
 class CURIE1misc extends Spec with ShouldMatchers {
 

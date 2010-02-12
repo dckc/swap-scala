@@ -5,8 +5,7 @@ import org.scalatest.matchers.ShouldMatchers
 
 import org.w3.swap
 import swap.webdata.RDFaParser
-import swap.rdflogic.Name
-import swap.rdfxml.XMLVar
+import swap.rdflogic.{Name, XMLVar}
 
 class RDFaMisc extends Spec with ShouldMatchers {
 

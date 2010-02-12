@@ -1,32 +1,23 @@
 package org.w3.swap.sparql
 
-import org.w3.swap
-import swap.logic.Formula
-
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
+
+import org.w3.swap
 
 /**
  * per http://www.w3.org/TR/rdf-sparql-query/#grammar
  *
  * Just enough for the RDFa test suite, i.e. ASK WHERE { pattern }
  */
-class SPARQLParser(override val baseURI: String
-		 ) extends swap.n3.TextRDF(baseURI) {
-  import swap.logic.{Term, Formula}
+abstract class SPARQLSyntax(override val initialBase: String
+		 ) extends swap.turtle.TurtleSyntax(initialBase) {
 
-  def mkstatement(s: Term, p: Term, o: Term): Formula = {
-    swap.rdf.Holds(s, p, o)
-  }
-
-  def AskQuery: Parser[Formula] = (
+  def AskQuery: Parser[Stream[Arc]] = (
     "(?i:ASK)".r ~> opt("(?i:WHERE)".r) ~>
-    "{" ~> repsep(statement, ".") <~ opt(".") <~ "}"
-    ) ^^ {
-    case statements => {
-      val fmlas = scopes.top.statements.toList.reverse
-      mkFormula(fmlas)
+    "{" ~> repsep(statement, ".") <~ opt(".") <~ "}" ^^ {
+      case statements => statements.toStream.flatMap { case arcs => arcs }
     }
-  }
+  )
 }
 
 

@@ -4,7 +4,7 @@ package org.w3.swap.ntriples
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
 
 import org.w3.swap
-import swap.rdf.RDFGraphParts
+import swap.rdf.RDFNodeBuilder
 
 /**
  * Parser for N-Triples, a simple line-oriented RDF format.
@@ -13,11 +13,9 @@ import swap.rdf.RDFGraphParts
  * <a href="http://www.w3.org/TR/2004/REC-rdf-testcases-20040210/#ntriples"
  * >section 3. N-Triples of <cite>RDF Test Cases</cite></a>.
  */
-abstract class NTriplesSyntax extends NTriplesTerms {
-  /**
-   * Whitespace is explicit in the N-Triples grammar.
-   */
-  override def skipWhitespace = false
+abstract class NTriplesSyntax extends NTriplesLex with RDFNodeBuilder {
+  def fresh(hint: String): BlankNode
+  def byName(name: String): BlankNode
 
   def lazyrep[T] (p: Parser[Stream[T]]): Parser[Stream[T]] = (
     p ~ lazyrep(p) ^^ { case hd~tl => hd ++ tl }
@@ -33,7 +31,6 @@ abstract class NTriplesSyntax extends NTriplesTerms {
       case None => Stream.empty
     }
       
-
   def comment: Parser[Option[Arc]] = """#[^\n\r]*""".r ^^ {
     case _ => None }
 
@@ -42,11 +39,33 @@ abstract class NTriplesSyntax extends NTriplesTerms {
     case s~_~p~_~o => Some((s, p, o))
   }
 
-  def subject: Parser[SubjectNode] = uriref | nodeID
+  def subject: Parser[SubjectNode] = urireft | nodeIDt
 
-  def predicate: Parser[Label] = uriref
+  def predicate: Parser[Label] = urireft
 
-  def `object`: Parser[Node] = uriref | nodeID | literal
+  def `object`: Parser[Node] = urireft | nodeIDt | literal
+
+  def urireft: Parser[Label] = uriref ^^ { case i => uri(i) }
+
+  def nodeIDt: Parser[BlankNode] = nodeID ^^ {
+    case id => byName(id)
+  }
+
+  def literal: Parser[Literal] = string ~ opt(language | datatype) ^^ {
+      case lex ~ Some(dt: String) => typed(lex, dt)
+
+      case str ~ Some(lang: LanguageTag) => plain(str, Some(lang))
+
+      case str ~ _ => plain(str, None)
+  }
+
+}
+
+abstract class NTriplesLex extends RegexParsers {
+  /**
+   * Whitespace is explicit in the N-Triples grammar.
+   */
+  override def skipWhitespace = false
 
   /**
    * Spec says: ws  	::=  	space | tab
@@ -56,21 +75,16 @@ abstract class NTriplesSyntax extends NTriplesTerms {
   def ws_s: Parser[String] = """[ \t]*""".r
 
   def eoln: Parser[String] = """\r|\n|(?:\r\n)""".r
-}
-
-abstract class NTriplesTerms extends RegexParsers with RDFGraphParts {
-
-  def blankNode(id: String): BlankNode
 
   /*
    * Spec says:
    * uriref  	::=  	'<' absoluteURI '>'
    * absoluteURI  	::=  	character+ with...
    *
-   * TODO: restrict to US-ASCII
+   * TODO: restrict to US-ASCII; escaping.
    */
-  def uriref: Parser[Label] = "<[^>]+>".r ^^ {
-    case str => uri(dequote(str))
+  def uriref: Parser[String] = "<[^>]+>".r ^^ {
+    case str => dequote(str)
   }
 
   /*
@@ -78,16 +92,8 @@ abstract class NTriplesTerms extends RegexParsers with RDFGraphParts {
    * nodeID  	::=  	'_:' name
    * name  	::=  	[A-Za-z][A-Za-z0-9]*
    */
-  def nodeID: Parser[BlankNode] = "_:[A-Za-z][A-Za-z0-9]*".r ^^ {
-    case xxname => blankNode(xxname.substring(2))
-  }
-
-  def literal: Parser[Literal] = string ~ opt(language | datatype) ^^ {
-    case lex ~ Some(dt: String) => typed(lex, dt)
-
-    case str ~ Some(lang: LanguageTag) => plain(str, Some(lang))
-
-    case str ~ _ => plain(str, None)
+  def nodeID: Parser[String] = "_:[A-Za-z][A-Za-z0-9]*".r ^^ {
+    case xxname => xxname.substring(2)
   }
 
   def string: Parser[String] = "\"[^\"\n]+\"".r ^^ { case s => dequote(s) }

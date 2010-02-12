@@ -1,18 +1,23 @@
 package org.w3.swap.rdfxml
 
-import org.w3.swap
-import swap.rdf.Vocabulary
-import swap.rdf.RDFGraphParts
-import swap.uri.Util.combine
-
 import scala.xml.{Elem, NodeSeq, Node, PrefixedAttribute}
 
-abstract class XMLtoRDF extends RDFGraphParts {
-  import Vocabulary.nsuri
-  val rdf_type = uri(Vocabulary.`type`)
+import org.w3.swap
+import swap.rdf.Vocabulary
+import swap.uri.Util.combine
+import swap.rdf.RDFNodeBuilder
 
+/**
+ * BlankNodes are built from XML names, but their type is still abstract..
+ */
+trait RDFXMLNodeBuilder extends RDFNodeBuilder {
   def fresh(hint: String): BlankNode
   def byName(name: String): BlankNode
+}
+
+
+abstract class XMLtoRDF extends RDFXMLNodeBuilder {
+  import Vocabulary.nsuri
 
   def getArcs(e: Elem, base: String): Stream[Arc] = {
     e match {

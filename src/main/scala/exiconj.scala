@@ -6,10 +6,12 @@ import swap.logic1.{Term, Variable}
 
 import scala.annotation.tailrec
 
+sealed abstract class ECFormula extends Formula
+case class Exists(vars: Set[Variable], g: And) extends ECFormula
+sealed abstract class Ground extends ECFormula
 // TODO: be sure we don't need arity for rel
-case class Atomic(rel: Symbol, args: List[Term]) extends Formula
-case class And(fmlas: Seq[Formula]) extends Formula
-case class Exists(vars: Set[Variable], g: Formula) extends Formula
+case class And(fmlas: Seq[Atomic]) extends Ground
+case class Atomic(rel: Symbol, args: List[Term]) extends Ground
 
 /**
  * Existential Conjunctive Logic
@@ -37,23 +39,7 @@ class ECLogic extends PropositionalCalculus {
     }
   }
 
-  // scalaQ: how to constrain Exists subfmla to And? problems with subst()
-  def wff(f: Formula): Boolean = {
-    def wfatom(f: Formula): Boolean = f match {
-      case a: Atomic => true
-      case _ => false
-    }
-
-    def wfconj(f: Formula): Boolean = f match {
-      case And(fmlas) => fmlas.forall(wfatom _)
-      case _ => false
-    }
-
-    freevars(f).isEmpty && (f match {
-      case Exists(vars, g) => wfconj(g)
-      case _ => false
-    })
-  }
+  def wff(f: Formula): Boolean = freevars(f).isEmpty
 
   def axiom(f: Formula) = false
 
@@ -61,17 +47,21 @@ class ECLogic extends PropositionalCalculus {
    * @return: if wff(f), the usual, else f
    * TODO: don't make a new formula unless we have to.
    */
-  def subst(f: Formula, s: Subst): Formula = {
+  def subst(f: Atomic, s: Subst): Atomic = {
+    Atomic(f.rel, f.args.map(_.subst(s)))
+  }
+  def subst(f: And, s: Subst): And = {
+    And(f.fmlas.map(subst(_, s)))
+  }
+  /**
+   * assume the vars in s don't occur in vars.
+   * i.e. you can only substitute for free variables.
+   * TODO: assert this. */
+  def subst(f: ECFormula, s: Subst): ECFormula = {
     f match {
-      /**
-       * assume the vars in s don't occur in vars.
-       * i.e. you can only substitute for free variables.
-       * TODO: assert this. */
-      case Exists(vars, g) => Exists(vars, subst(f, s))
-      case And(fmlas) => And(fmlas.map(subst(_, s)))
-
-      case Atomic(rel, terms) => Atomic(rel, terms.map(_.subst(s)))
-      case _ => f // not wff
+      case Exists(vars, a) => Exists(vars, subst(a, s))
+      case x: And => subst(x, s)
+      case x: Atomic => subst(x, s)
     }
   }
 
