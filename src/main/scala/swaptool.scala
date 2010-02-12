@@ -18,7 +18,7 @@ import javax.servlet.http.{HttpServlet,
 			   HttpServletRequest, HttpServletResponse}
 
 import org.w3.swap
-import swap.WebData
+import swap.webdata
 
 class HelloWorld extends HttpServlet {
   override def doGet(request: HttpServletRequest,
@@ -45,11 +45,11 @@ class RDFaExtractor extends HttpServlet {
 	  val href = doc \ "head" \ "base" \ "@href"
 	  val base = if (href.isEmpty) addr else href.text
 
-	  val arcs = swap.rdf.RDFaSyntax.getArcs(doc, base)
+	  val arcs = webdata.RDFaParser.getArcs(doc, base)
 	
 	  response.setContentType("application/rdf+xml; charset='utf-8'")
 
-	  swap.rdf.RDFXMLout.writeArcsDoc(response.getWriter, arcs)
+	  swap.rdfxml.SimpleSerializer.writeArcsDoc(response.getWriter, arcs)
 	}
 	case Left(e: java.lang.IllegalArgumentException) =>
 	  response.sendError(HttpServletResponse.SC_BAD_REQUEST,
