@@ -28,11 +28,9 @@ object N3Tool {
     stdout.close()
   }
 
-  def readTurtle(fname: String) {
-    val parser = new TurtleParser(fname)
+  def readTurtle(addr: String) {
     try {
-      val reader = new FileReader(fname)
-      val arcs = parser.arcs(parser.parseAll(parser.turtleDoc, reader))
+      val arcs = WebData.loadTurtle(addr)
       rdfxml.SimpleSerializer.writeArcsDoc(stdout, arcs)
     } catch {
       // TODO: diagnostics to stderr

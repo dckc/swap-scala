@@ -54,7 +54,7 @@ object Util {
     else {
       val Parts(_, scheme, _, ab, pb, _, qb, _, fb) = base
       if (scheme == null || scheme == "") {
-	throw new ParseException("missing scheme in base URI", 0)
+	throw new ParseException("missing scheme in base URI" + base, 0)
       }
 
       val authority = if (ar == null) ab else ar

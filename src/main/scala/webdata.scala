@@ -43,7 +43,10 @@ object WebData extends TermNode {
   /**
    * @throws IOException if openConnection(addr) throws one
    */
-  def loadTurtle(addr: String): Stream[Arc] = loadTurtle(addr, addr)
+  def loadTurtle(addr: String): Stream[Arc] = {
+    val abs = cwdbased(addr)
+    loadTurtle(abs, abs)
+  }
 
   /**
    * @throws IOException if openConnection(addr) throws one
