@@ -19,7 +19,7 @@ trait RDFGraphParts {
    */
   type Arc = (SubjectNode, Label, Node)
 
-  type Node <: AnyRef
+  type Node
   type Literal <: Node
   type SubjectNode <: Node
   type BlankNode <: SubjectNode
