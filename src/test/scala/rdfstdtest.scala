@@ -163,9 +163,9 @@ extends TestSuite(manifest) {
   }
 }
 
-/* @@ need to restore SPARQL parser...
 class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
   import swap.rdflogic.{RDFLogic => RL}
+  import swap.webdata.RDFQ
 
   val what = manifest.qvar
   val what2 = manifest.vars.fresh("what")
@@ -198,9 +198,9 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 	      if (!result) {
 		println()
 		println("expected (from SPARQL):")
-		println(pattern.quote().pretty())
+		println(RDFQ.quote(pattern).pretty())
 		println("actual:")
-		println(data.quote().pretty())
+		println(RDFQ.quote(data).pretty())
 	      }
 	      (test, titlestr, RunResult(result))
 	    }
@@ -210,7 +210,6 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
     }
   }
 }
-*/
 
 class RDFaExample(indoc: String, outdoc: String) {
   import swap.rdflogic.{RDFLogic => RL}
@@ -241,7 +240,7 @@ object Runner {
 
     val results = args(0) match {
       case "--entailment" => new EntailmentTestSuite(manifest).run()
-//@@      case "--rdfa" => new RDFaTestSuite(manifest).run()
+      case "--rdfa" => new RDFaTestSuite(manifest).run()
       case "--rdfax" => new RDFaExample(args(1), args(2)).run()
       case _ => {
 	println("Usage: rdfstdtest --entailment|--rdfa manifest")

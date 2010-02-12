@@ -8,7 +8,12 @@ import org.w3.swap
 import swap.rdfxml
 import swap.rdfa
 import swap.logic1.Variable
-import swap.rdflogic.{RDFXMLTerms, TermNode, Scope, XMLVar}
+import swap.logic1ec.{ECFormula, Exists, And, Atomic}
+import swap.rdflogic.{RDFXMLTerms, TermNode, Scope, XMLVar,
+		      Name, Plain, Data, XMLLit}
+import swap.sexp.{SExp, Cons, Atom}
+import SExp.fromSeq
+
 
 /**
  * WebData can read RDF in various formats using rdflogic terms as nodes.
@@ -82,7 +87,8 @@ trait ConcreteParser extends Parsers with RDFXMLTerms {
       case Success(arcs, _) => arcs
 
       case failure => {
-	throw new RuntimeException("@@parse failure:" + failure)
+	Stream((Name("data:parse"), Name("data:problem"),
+		Plain("@@parse failure:" + failure, None)))
       }
     }
   }
@@ -177,11 +183,6 @@ extends ConjunctiveKB with RDFXMLTerms {
 
 }
 
-import swap.sexp.{SExp, Cons, Atom}
-import SExp.fromSeq
-import swap.logic1ec.{ECFormula, Exists, And, Atomic}
-import swap.rdflogic.{XMLVar, Name, Plain, Data, XMLLit}
-
 object RDFQ {
   implicit def sym(s: Symbol): Atom = Atom(s)
 
@@ -200,7 +201,7 @@ object RDFQ {
   def quote(f: ECFormula): SExp = {
     f match {
       case Exists(vars, g) => fromSeq(List('exists,
-					   fromSeq(vars.toSeq),
+					   fromSeq(vars.toSeq.map(quote _)),
 					   quote(g)))
       case And(fmlas) => fromSeq(List('and) ++ fmlas.map(quote _))
       case Atomic(rel, args) => fromSeq(rel :: args.map(quote _))
