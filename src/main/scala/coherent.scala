@@ -1,7 +1,7 @@
 package org.w3.swap.logic1cl
 
 import org.w3.swap
-import swap.logic0.{FormalSystem, Formula}
+import swap.logic0.{FormalSystem}
 import swap.logic1.{Term, Variable}
 
 /**
@@ -15,6 +15,7 @@ import swap.logic1.{Term, Variable}
  * http://chatlogs.planetrdf.com/swig/2010-02-12#T23-17-03
  */
 abstract class CoherentLogic extends FormalSystem {
+  type Formula = CLFormula
 
   /**
    * Does the conclusion consist of a single Atom?
@@ -56,7 +57,7 @@ abstract class CoherentLogic extends FormalSystem {
 /**
  * Definition 1: Coherent formula, disjunction, conjunction, implication.
  */
-sealed abstract class CLFormula extends Formula
+sealed abstract class CLFormula
 case class Atomic(rel: Symbol, args: List[Term]) extends CLFormula
 case class Implication(c: Conjunction, d: Disjunction) extends CLFormula
 case class Conjunction(ai: List[Atomic]) extends CLFormula

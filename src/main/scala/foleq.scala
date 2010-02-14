@@ -1,7 +1,7 @@
 package org.w3.swap.logic1eq
 
 import org.w3.swap
-import swap.logic0.{Formula, PropositionalCalculus, Or, Not}
+import swap.logic0.{Atomic, PropositionalCalculus, Or, Not}
 import swap.logic1.{Term, Variable}
 
 import scala.annotation.tailrec
@@ -39,4 +39,4 @@ abstract class FOLeq extends PropositionalCalculus {
   }
 }
 
-case class Equal(x: Term, y: Term) extends Formula
+case class Equal(x: Term, y: Term) extends Atomic

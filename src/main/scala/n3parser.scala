@@ -6,7 +6,6 @@ import scala.collection.immutable.ListSet
 
 import org.w3.swap
 import swap.uri.Util.combine
-import swap.logic0.Formula
 import swap.logic1ec.And
 import swap.rdf.RDFNodeBuilder
 import swap.turtle.TurtleLex

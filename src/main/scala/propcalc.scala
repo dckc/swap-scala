@@ -1,19 +1,22 @@
 package org.w3.swap.logic0
 
+
 /**
  * Shoenfield's rules of propositional calculus [83]
  * from Milawa.
  */
 abstract class PropositionalCalculus extends FormalSystem {
+  type Formula = Formula0
+
   /**
    * From ((A or B) or C) derive (A or (B or C))
    */
   def associativity(pi: List[Formula], q: Formula): Boolean = {
     q match {
       case Or(Or(a, b), c) => pi match {
-	case List(Or(aa, Or(bb, cc))) => (a == aa && b == bb && c == cc)
-	  
-	  case _ => false
+        case List(Or(aa, Or(bb, cc))) => (a == aa && b == bb && c == cc)
+
+        case _ => false
       }
       case _ => false
     }
@@ -36,9 +39,9 @@ abstract class PropositionalCalculus extends FormalSystem {
   def cut(pi: List[Formula], q: Formula): Boolean = {
     q match {
       case Or(b, c) => pi match {
-	case List(Or(a, bb), Or(Not(aa), cc)) =>
-	  a == aa && b == bb && c == cc
-	case _ => false
+        case List(Or(a, bb), Or(Not(aa), cc)) =>
+          a == aa && b == bb && c == cc
+        case _ => false
       }
       case _ => false
     }
@@ -50,8 +53,8 @@ abstract class PropositionalCalculus extends FormalSystem {
   def expansion(pi: List[Formula], q: Formula): Boolean = {
     q match {
       case Or(a, b) => pi match {
-	case List(bb) => bb == b && wff(a)
-	case _ => false
+        case List(bb) => bb == b && wff(a)
+        case _ => false
       }
       case _ => false
     }
@@ -68,13 +71,13 @@ abstract class PropositionalCalculus extends FormalSystem {
   }
 
   val methods = List('ASSOCIATIVITY, 'CONTRACTION, 'CUT, 'EXPANSION,
-		     'PROPOSITIONAL_SCHEMA)
+    'PROPOSITIONAL_SCHEMA)
 
   def rule(method: Symbol): Rule = {
     assert(methods contains method)
     // TODO: consider moving rules in here and using match
     val rules = List(associativity _, contraction _, cut _, expansion _,
-		     propositional_schema _)
+      propositional_schema _)
     rules(methods.indexOf(method))
   }
 
@@ -82,6 +85,7 @@ abstract class PropositionalCalculus extends FormalSystem {
   // TODO: perhaps def and(a, b) = Not(Or(Not(a), Not(b)))
 }
 
-case class Or(a: Formula, b: Formula) extends Formula
-case class Not(a: Formula) extends Formula
-
+sealed abstract class Formula0
+case class Or(a: Formula0, b: Formula0) extends Formula0
+case class Not(a: Formula0) extends Formula0
+abstract class Atomic extends Formula0

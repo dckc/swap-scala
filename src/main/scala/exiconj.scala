@@ -1,12 +1,13 @@
 package org.w3.swap.logic1ec
 
 import org.w3.swap
-import swap.logic0.{Formula, PropositionalCalculus, Or, Not, Appeal}
+import swap.logic0
+import swap.logic0.{FormalSystem, Or, Not}
 import swap.logic1.{Term, Variable}
 
 import scala.annotation.tailrec
 
-sealed abstract class ECFormula extends Formula
+sealed abstract class ECFormula
 case class Exists(vars: Set[Variable], g: And) extends ECFormula
 sealed abstract class Ground extends ECFormula
 // TODO: be sure we don't need arity for rel
@@ -16,7 +17,8 @@ case class Atomic(rel: Symbol, args: List[Term]) extends Ground
 /**
  * Existential Conjunctive Logic
  */
-class ECLogic extends PropositionalCalculus {
+class ECLogic extends FormalSystem {
+  override type Formula = ECFormula
   import Term.Subst
 
   def terms(f: Formula): Seq[Term] = {
@@ -67,4 +69,10 @@ class ECLogic extends PropositionalCalculus {
 
   // TODO
   def appeal_step_ok(x: Appeal, thms: List[Formula]): Boolean = false
+
+  override val methods = List[Symbol]()
+
+  override def rule(method: Symbol): Rule = {     // TODO
+    case (premises, conclusion) => false
+  }
 }

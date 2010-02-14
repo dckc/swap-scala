@@ -1,7 +1,7 @@
 package org.w3.swap.logic1c
 
 import org.w3.swap
-import swap.logic0.{Formula, Or, Not, Appeal}
+import swap.logic0.{Formula0, Or, Not}
 import swap.logic1.{Term, FunctionTerm, Variable}
 import Term.Subst
 import swap.logic1eq.{Equal, FOLeq }
@@ -16,19 +16,19 @@ abstract class ComputationalLogic extends FOLeq {
 
   def quote(f: Formula): SExp = {
     f match {
-      // TODO: make a SExp constructor from List[Any]
+    // TODO: make a SExp constructor from List[Any]
       case Or(a, b) =>
-	fromSeq(List(Symbol("POR*"), quote(a), quote(b)))
+        fromSeq(List(Symbol("POR*"), quote(a), quote(b)))
 
       case Not(a) =>
-	fromSeq(List(Symbol("PNOT*"), quote(a)))
+        fromSeq(List(Symbol("PNOT*"), quote(a)))
 
       case Equal(x: Quotable, y: Quotable) =>
-	fromSeq(List(Symbol("PEQUAL*"), x.quote(), y.quote() ))
+        fromSeq(List(Symbol("PEQUAL*"), x.quote(), y.quote() ))
 
       case _ =>
-	if (wff(f)) throw new Exception("quote or wff is broken")
-	else throw new RuntimeException("quote called on non-wff: " + f)
+        if (wff(f)) throw new Exception("quote or wff is broken")
+        else throw new RuntimeException("quote called on non-wff: " + f)
     }
   }
 
@@ -52,7 +52,7 @@ abstract class ComputationalLogic extends FOLeq {
   }
 }
 
-class History(atbl: Map[Symbol, Int], axioms: List[Formula])
+class History(atbl: Map[Symbol, Int], axioms: List[Formula0])
 extends ComputationalLogic {
   override def wff(f: Formula): Boolean = {
     terms(f).forall {

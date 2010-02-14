@@ -3,6 +3,8 @@
   <component name="CompilerConfiguration">
     <option name="DEFAULT_COMPILER" value="Javac" />
     <excludeFromCompile>
+      <directory url="file://$PROJECT_DIR$/src/main/obsolete" includeSubdirectories="true" />
+      <directory url="file://$PROJECT_DIR$/src/test/obsolete" includeSubdirectories="true" />
       <directory url="file://$PROJECT_DIR$/lib_managed/scala_2.8.0.Beta1-RC5/test" includeSubdirectories="true" />
     </excludeFromCompile>
     <resourceExtensions>
