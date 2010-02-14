@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="servlet">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/lib_managed/scala_2.8.0.Beta1-RC5/provided" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+    <jarDirectory url="file://$PROJECT_DIR$/lib_managed/scala_2.8.0.Beta1-RC5/provided" recursive="false" />
+  </library>
+</component>

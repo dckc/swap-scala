@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager" verified="true">
-    <list default="true" readonly="true" id="a2ba93e9-87b3-4752-ab1c-58cceadc1a2b" name="Default" comment="" />
-    <ignored path="rdfsem.iws" />
+    <list default="true" readonly="true" id="a2ba93e9-87b3-4752-ab1c-58cceadc1a2b" name="Default" comment="">
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/n3parser.scala" afterPath="$PROJECT_DIR$/src/main/scala/n3parser.scala" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Rdfsem.iml" afterPath="$PROJECT_DIR$/Rdfsem.iml" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/src/main/scala/logicsyntax.scala" afterPath="" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/compiler.xml" afterPath="$PROJECT_DIR$/.idea/compiler.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/libraries/scalatest.xml" afterPath="$PROJECT_DIR$/.idea/libraries/scalatest.xml" />
+      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/libraries/servlet.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main/scala/turtlep.scala" afterPath="$PROJECT_DIR$/src/main/scala/turtlep.scala" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/libraries/lib.xml" afterPath="$PROJECT_DIR$/.idea/libraries/lib.xml" />
+      <change type="DELETED" beforePath="$PROJECT_DIR$/src/main/scala/rdf2004.scala" afterPath="" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/DevNotes" afterPath="$PROJECT_DIR$/DevNotes" />
+    </list>
     <ignored path=".idea/workspace.xml" />
+    <ignored path="rdfsem.iws" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,64 +77,37 @@
   <component name="FileColors" enabled="true" enabledForTabs="true" />
   <component name="FileEditorManager">
     <leaf>
-      <file leaf-file-name="n3parser.scala" pinned="false" current="false" current-in-tab="false">
+      <file leaf-file-name="n3parser.scala" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main/scala/n3parser.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="79" column="9" selection-start="2100" selection-end="2100" vertical-scroll-proportion="0.0">
+            <state line="182" column="30" selection-start="5251" selection-end="5251" vertical-scroll-proportion="0.33333334">
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="n3parse1.scala" pinned="false" current="true" current-in-tab="true">
+      <file leaf-file-name="swaptool.scala" pinned="false" current="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/scala/swaptool.scala">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="16" column="13" selection-start="423" selection-end="423" vertical-scroll-proportion="0.0">
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="turtlep.scala" pinned="false" current="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/main/scala/turtlep.scala">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="230" column="20" selection-start="6451" selection-end="6465" vertical-scroll-proportion="0.0">
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="n3parse1.scala" pinned="false" current="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/test/scala/n3parse1.scala">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="97" column="6" selection-start="2804" selection-end="2804" vertical-scroll-proportion="0.1456693">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="rdfsem1.scala" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/test/scala/rdfsem1.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="103" column="7" selection-start="2436" selection-end="2436" vertical-scroll-proportion="0.0">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="ntriples1.scala" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/test/scala/ntriples1.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="5" column="6" selection-start="99" selection-end="99" vertical-scroll-proportion="0.0">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="ntriples.scala" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/ntriples.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="71" column="8" selection-start="2040" selection-end="2040" vertical-scroll-proportion="0.0">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="rdf2004.scala" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/rdf2004.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="230" column="6" selection-start="6187" selection-end="6187" vertical-scroll-proportion="0.0">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="sexp.scala" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/scala/sexp.scala">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="38" column="98" selection-start="989" selection-end="989" vertical-scroll-proportion="0.0">
+            <state line="80" column="7" selection-start="2286" selection-end="2286" vertical-scroll-proportion="0.0">
               <folding />
             </state>
           </provider>
@@ -139,6 +124,8 @@
     <option name="changedFiles">
       <list>
         <option value="$PROJECT_DIR$/src/test/scala/n3parse1.scala" />
+        <option value="$PROJECT_DIR$/src/main/scala/turtlep.scala" />
+        <option value="$PROJECT_DIR$/src/main/scala/n3parser.scala" />
       </list>
     </option>
   </component>
@@ -177,10 +164,10 @@
       <sortByType />
     </navigator>
     <panes>
+      <pane id="Favorites" />
       <pane id="ProjectPane">
         <subPane />
       </pane>
-      <pane id="Favorites" />
       <pane id="PackagesPane">
         <subPane>
           <PATH>
@@ -257,7 +244,7 @@
     <property name="project.structure.last.edited" value="Libraries" />
     <property name="project.structure.proportion" value="0.15" />
     <property name="options.splitter.main.proportions" value="0.3" />
-    <property name="options.lastSelected" value="org.jetbrains.plugins.scala.debugger.filters.ScalaDebuggerSettingsConfigurable" />
+    <property name="options.lastSelected" value="com.intellij.compiler.options.CompilerConfigurable$3" />
     <property name="MemberChooser.sorted" value="false" />
     <property name="recentsLimit" value="5" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$/src/test/scala" />
@@ -453,6 +440,9 @@
     </configuration>
   </component>
   <component name="ShelveChangesManager" show_recycled="false" />
+  <component name="StructureViewFactory">
+    <option name="ACTIVE_ACTIONS" value="ALPHA_COMPARATOR" />
+  </component>
   <component name="SvnConfiguration">
     <option name="USER" value="" />
     <option name="PASSWORD" value="" />
@@ -491,19 +481,19 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="10" y="25" width="1260" height="974" extended-state="0" />
-    <editor active="true" />
+    <editor active="false" />
     <layout>
-      <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32932693" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Changes" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.32932693" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Palette" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32932693" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
+      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32932693" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32932693" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
-      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24916944" sideWeight="0.22115384" order="1" side_tool="true" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24916944" sideWeight="0.46995193" order="1" side_tool="true" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.3297342" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.39950165" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24916944" sideWeight="0.43269232" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24916944" sideWeight="0.18389423" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Dependency Viewer" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32932693" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
@@ -563,77 +553,65 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/ntriples.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="71" column="8" selection-start="2040" selection-end="2040" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/rdf2004.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="230" column="6" selection-start="6187" selection-end="6187" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
+        <state line="71" column="8" selection-start="2040" selection-end="2040" vertical-scroll-proportion="0.0" />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/test/scala/ntriples1.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="5" column="6" selection-start="99" selection-end="99" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
+        <state line="5" column="6" selection-start="99" selection-end="99" vertical-scroll-proportion="0.0" />
       </provider>
     </entry>
     <entry file="jar://$PROJECT_DIR$/lib_managed/scala_2.8.0.Beta1-RC5/test/scalatest-1.0.1-for-scala-2.8.0.Beta1-RC5-with-test-interfaces-0.2-SNAPSHOT.jar!/org/scalatest/matchers/Matchers.class">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="738" column="6" selection-start="76703" selection-end="76703" vertical-scroll-proportion="0.7642487">
-          <folding />
-        </state>
+        <state line="738" column="6" selection-start="76703" selection-end="76703" vertical-scroll-proportion="0.7642487" />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/Rdfsem.iml">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="15" column="0" selection-start="673" selection-end="673" vertical-scroll-proportion="0.26615968">
-          <folding />
-        </state>
+        <state line="15" column="0" selection-start="673" selection-end="673" vertical-scroll-proportion="0.26615968" />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/sexp.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="38" column="98" selection-start="989" selection-end="989" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/test/scala/rdfsem1.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="103" column="7" selection-start="2436" selection-end="2436" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/scala/logicsyntax.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="196" column="17" selection-start="4817" selection-end="4817" vertical-scroll-proportion="0.19488189">
-          <folding />
-        </state>
+        <state line="38" column="98" selection-start="989" selection-end="989" vertical-scroll-proportion="0.0" />
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/test/scala/sexp1.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="5" column="6" selection-start="99" selection-end="99" vertical-scroll-proportion="0.13779527">
+        <state line="5" column="6" selection-start="99" selection-end="99" vertical-scroll-proportion="0.13779527" />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/test/scala/n3parse1.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="80" column="7" selection-start="2286" selection-end="2286" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/scala/swaptool.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="16" column="13" selection-start="423" selection-end="423" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$PROJECT_DIR$/project/boot/scala-2.8.0.Beta1-RC5/lib/scala-library.jar!/scala/util/parsing/combinator/RegexParsers.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="7" column="15" selection-start="512" selection-end="512" vertical-scroll-proportion="0.19291338">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/scala/turtlep.scala">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="230" column="20" selection-start="6451" selection-end="6465" vertical-scroll-proportion="0.0">
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main/scala/n3parser.scala">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="79" column="9" selection-start="2100" selection-end="2100" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/test/scala/n3parse1.scala">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="97" column="6" selection-start="2804" selection-end="2804" vertical-scroll-proportion="0.1456693">
+        <state line="182" column="30" selection-start="5251" selection-end="5251" vertical-scroll-proportion="0.33333334">
           <folding />
         </state>
       </provider>
