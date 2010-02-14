@@ -21,6 +21,7 @@ import SExp.fromSeq
 object WebData extends TermNode {
 
   // TODO: conneg
+  // TODO: use a callback rather than Stream[Arc]
   def loadRDFXML(addr: String): Stream[Arc] = {
     val base = cwdbased(addr)
     val e = XML.load(base)

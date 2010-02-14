@@ -22,6 +22,7 @@ abstract class NTriplesSyntax extends NTriplesLex with RDFNodeBuilder {
     | success(Stream.empty)
   )
 
+  // TODO: use a callback rather than Stream[Arc]
   def ntripleDoc: Parser[Stream[Arc]] = lazyrep(line)
 
   def line: Parser[Stream[Arc]] =
