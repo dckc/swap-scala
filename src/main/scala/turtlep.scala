@@ -179,6 +179,7 @@ class TurtleLex extends RegexParsers {
     case str => str.substring(2)
   }
 
+  // TODO: non-ASCII name characters
   /* note _:xyz is an evar but _a:xyz is a qname */
   val prefix_re = """(?:((?:_[A-Za-z0-9_]+)|(?:[A-Za-z][A-Za-z0-9_]*)|):)"""
   val localname_re = """([A-Za-z][A-Za-z0-9_-]*)"""
