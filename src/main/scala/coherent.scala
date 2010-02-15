@@ -84,7 +84,11 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 	if (solutions.isEmpty) None
 	else {
 	  val s = solutions.head
-	  val pfc = Appeal('ERASURE, subst(e.c, s), pfs, Nil)
+	  val c_closed = subst(e.c, s)
+	  // pfs.find is perhaps re-doing work that was done in solve?
+	  val relevant = c_closed.ai.map {
+	    a => pfs.find(_.conclusion == a).get }
+	  val pfc = Appeal('AND_INTRO, subst(e.c, s), relevant, Nil)
 	  Some(Appeal('EXISTS_INTRO, e, List(pfc), List(s)))
 	}
       }
@@ -123,14 +127,12 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
        case Nil => Stream((chosen, pfs))
        case (d0, pf0) :: dp1n => {
 	 d0.ei.toStream.flatMap {
-	   case Exists(xi, cij) => {
+	   case e @ Exists(xi, cij) => {
 	     val (s, params) = mksubst(xi, Nil, parameter, Map())
 	     val cij_closed = subst(cij, s)
-
-	     combinations(chosen + cij_closed,
-			  Appeal('EXISTS_ELIM, cij_closed,
-				 List(pf0), List(s)) :: pfs,
-			  dp1n)
+	     val pfe = Appeal('CONTRACTION, e, List(pf0), Nil)
+	     val pfc = Appeal('EXISTS_ELIM, cij_closed, List(pfe), List(s))
+	     combinations(chosen + cij_closed, pfc :: pfs, dp1n)
 	   }
 	 }
        }
@@ -212,6 +214,7 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
 /**
  * Definition 1: Coherent formula, disjunction, conjunction, implication.
+ * TODO: allow Atomic where Conjunction goes, etc.
  */
 sealed abstract class CLFormula
 case class Implication(c: Conjunction, d: Disjunction) extends CLFormula

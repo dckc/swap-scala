@@ -84,6 +84,7 @@ case class Atom(val x: Any) extends SExp {
 
   override def toString(): String = {
     x match {
+      case s: Symbol if s == 'NIL => "()"
       /* lisp syntax, not scala syntax.
        * Well... close, anyway... lowercase symbols
        * and such should print as |foo|. */
