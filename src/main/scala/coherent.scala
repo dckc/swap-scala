@@ -18,10 +18,12 @@ import swap.logic1ec.{AtomicParts, ConjunctiveQuery}
  *
  * TODO: split out proof generation part
  */
-abstract class CoherentLogic extends FormalSystem with ConjunctiveQuery[Atomic]{
+
+abstract class CoherentLogic(theory: Seq[Implication])
+extends FormalSystem with ConjunctiveQuery[Atomic]{
   type Formula = CLFormula
 
-  def axiom(f: Formula) = false
+  def axiom(f: Formula) = theory contains f
 
   /**
    * Does the conclusion consist of a single Atom?
@@ -56,7 +58,6 @@ abstract class CoherentLogic extends FormalSystem with ConjunctiveQuery[Atomic]{
   }
 
   val bottom = Disjunction(Nil)
-  type Theory = Seq[Implication] // hmmm... Set? Iterable?
 
   type State = Set[Atomic] // all closed
 
@@ -111,7 +112,7 @@ abstract class CoherentLogic extends FormalSystem with ConjunctiveQuery[Atomic]{
    * @return true if d is a breadth-first consequence of x in t
    * Loops forever if not, as ECLogic is only semi-decidable. :-/
    */
-  def consequence_bf(t: Theory, x: State, d: Disjunction): Boolean = {
+  def consequence_bf(x: State, d: Disjunction): Boolean = {
     assert(x.forall(wff _))
     assert(wff(d))
 
@@ -123,7 +124,7 @@ abstract class CoherentLogic extends FormalSystem with ConjunctiveQuery[Atomic]{
       if (true_in(d, x)) true // base case
       else { // induction step
 	val d0n = for {
-	  Implication(c, d) <- t
+	  Implication(c, d) <- theory
 	  solution <- solve(c, x)
 	  consequently = assert(true_in(subst(c, solution), x))
 	  di = subst(d, solution)
