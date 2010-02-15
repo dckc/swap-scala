@@ -19,7 +19,7 @@ import swap.logic1ec.{AtomicParts, ConjunctiveQuery}
  * TODO: split out proof generation part
  */
 
-abstract class CoherentLogic(theory: Seq[Implication])
+abstract class CoherentLogic(theory: List[Implication])
 extends FormalSystem with ConjunctiveQuery[Atomic]{
   type Formula = CLFormula
 
@@ -61,16 +61,35 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
   type State = Set[Atomic] // all closed
 
-  def true_in(c: Conjunction, state: State): Boolean = {
+  def true_in(c: Conjunction, state: State,
+	      pfs: List[Appeal]): Option[Appeal] = {
     assert(state.forall(wff _))
     assert(wff(c))
-    c.ai.forall(state.contains(_))
+    if (c.ai.forall(state.contains(_))) {
+      Some(Appeal('AND_INTRO, c,
+		  c.ai.map {a => pfs.find(_.conclusion == a).get},
+		  Nil))
+    }
+    else None
   }
 
-  def true_in(d: Disjunction, state: State): Boolean = {
+  def true_in(d: Disjunction, state: State,
+	      pfs: List[Appeal]): Option[Appeal] = {
     assert(state.forall(wff _))
     assert(wff(d))
-    d.ei.exists { case Exists(xi, c) => !solve(c, state).isEmpty }
+
+    val answers = d.ei.toStream flatMap {
+      e => {
+	val solutions = solve(e.c, state)
+	if (solutions.isEmpty) None
+	else {
+	  val s = solutions.head
+	  val pfc = Appeal('ERASURE, subst(e.c, s), pfs, Nil)
+	  Some(Appeal('EXISTS_INTRO, e, List(pfc), List(s)))
+	}
+      }
+    }
+    if (answers.isEmpty) None else Some(answers.head)
   }
 
   def fresh(pattern: Variable): Variable
@@ -89,7 +108,7 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
   }
 
   def closed_instance(c: Conjunction): Conjunction = {
-    val (s, vars) = mksubst(freevars(c), Nil, parameter, Map())
+    val (s, params) = mksubst(freevars(c), Nil, parameter, Map())
     subst(c, s)
   }
 
@@ -97,13 +116,23 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
   /**
    * all possible combinations of selecting one disjunct from each Di
    */
-   def combinations(chosen: Set[Conjunction],
-     todo: List[Disjunction]): Stream[Set[Conjunction]] = {
+   def combinations(chosen: Set[Conjunction], pfs: List[Appeal],
+     todo: List[(Disjunction, Appeal)]): Stream[(Set[Conjunction],
+						 List[Appeal])] = {
      todo match {
-       case Nil => Stream(chosen)
-       case di :: dn => {
-	 di.ei.toStream.flatMap { case Exists(_, cij) =>
-	   combinations(chosen + closed_instance(cij), dn) }
+       case Nil => Stream((chosen, pfs))
+       case (d0, pf0) :: dp1n => {
+	 d0.ei.toStream.flatMap {
+	   case Exists(xi, cij) => {
+	     val (s, params) = mksubst(xi, Nil, parameter, Map())
+	     val cij_closed = subst(cij, s)
+
+	     combinations(chosen + cij_closed,
+			  Appeal('EXISTS_ELIM, cij_closed,
+				 List(pf0), List(s)) :: pfs,
+			  dp1n)
+	   }
+	 }
        }
      }
    }
@@ -112,31 +141,59 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
    * @return true if d is a breadth-first consequence of x in t
    * Loops forever if not, as ECLogic is only semi-decidable. :-/
    */
-  def consequence_bf(x: State, d: Disjunction): Boolean = {
+  def derive_bf(x: State, pfs: List[Appeal], d: Disjunction): Option[Appeal] = {
     assert(x.forall(wff _))
     assert(wff(d))
 
     println("@@search conjecture: " + d)
 
-    def search(x: State): Boolean = {
+    def search(x: State, pfs: List[Appeal]): Option[Appeal] = {
       println("@@search state: " + x)
 
-      if (true_in(d, x)) true // base case
+      val base = true_in(d, x, pfs)
+      if (!base.isEmpty) base
       else { // induction step
-	val d0n = for {
-	  Implication(c, d) <- theory
+	val d_pf0n = for {
+	  ax <- theory
+	  c = ax.c
+	  d = ax.d
 	  solution <- solve(c, x)
-	  consequently = assert(true_in(subst(c, solution), x))
+	  ci = subst(c, solution)
 	  di = subst(d, solution)
-	  if !true_in(di, x)
-	} yield di
+	  if true_in(di, x, pfs).isEmpty
+	  imp_closed = Implication(ci, di)
+	} yield {
+	  val pf_ci = true_in(ci, x, pfs).get
 
-	combinations(Set.empty, d0n.toList).forall {
-	  cset: Set[Conjunction] => search(x union cset.flatMap(_.ai.toSet)) }
+	  val pf_imp = Appeal('INSTANTIATION, imp_closed,
+			      List(Appeal('AXIOM, ax, Nil, Nil)),
+			      List(solution))
+
+	  val pf_di = Appeal('MODUS_PONENS, di,
+			     List(pf_imp, pf_ci), Nil)
+	  (di, pf_di)
+	}
+
+	val trypfs = combinations(Set.empty, Nil, d_pf0n).map {
+	  case (cset, cpfs) => {
+	    val newfacts = cset.toList.flatMap(_.ai).toSet
+	    val newpfs = cpfs.flatMap {
+	      case pf @ Appeal(_, Conjunction(ai), _, _) => ai.map {
+		fact => Appeal('ERASURE, fact, List(pf), Nil) }
+	      case _ => Nil // can't actually happen
+	    }
+	    search(x union newfacts, newpfs ++ pfs)
+	  }
+	}
+
+	// if the search above terminates, all cases were proved.
+	assert(trypfs.forall(!_.isEmpty))
+	val allpfs = trypfs.toList.map(_.get)
+	Some(Appeal('OR_INTRO, d, allpfs, Nil))
       }
     }
 
-    search(x)
+    search(x, pfs)
   }
 
   def solve(c: Conjunction, state: Set[Atomic]): Stream[Subst] = {

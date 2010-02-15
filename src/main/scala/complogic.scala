@@ -83,7 +83,7 @@ case class Constant(value: SExp) extends FunctionTerm with Quotable {
   override def subst(s: Subst) = this
 
   val hd = Atom('QUOTE)
-  override def quote() = Cons(hd, value)
+  override def quote() = fromSeq(List(hd, value))
 }
 
 case class App(sym: Symbol, params: List[Term with Quotable])

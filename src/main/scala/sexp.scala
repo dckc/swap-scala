@@ -38,14 +38,30 @@ sealed abstract class SExp {
 case class Cons(head: SExp, tail: SExp) extends SExp {
   import SExp.{writeTail, docTail}
 
-  override def doc = DocGroup("(" :: DocNest(2, head.doc :/: docTail(tail)))
+  override def doc = {
+    head match {
+      case Atom(x) if x == 'QUOTE => {
+	tail match {
+	  case Cons(v, rest) if rest == SExp.NIL => {
+	    DocGroup("'" :: v.doc)
+	  }
+	  case _ => throw new Exception("bad 'quote tail:" + this.toString())
+	}
+      }
+
+      case _ => {
+	DocGroup("(" :: DocNest(2, head.doc :/: docTail(tail)))
+      }
+    }
+  }
+
 
   override def writeTo(w: Writer) {
 
     head match {
-      case Atom('quote) => {
+      case Atom(x) if x == 'QUOTE => {
 	tail match {
-	  case Cons(v, _) => {
+	  case Cons(v, rest) if rest == SExp.NIL => {
 	    w.append("'")
 	    v.writeTo(w)
 	  }
