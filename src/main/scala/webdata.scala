@@ -145,7 +145,7 @@ extends ConjunctiveKB with RDFXMLTerms {
    * Make handy variable fresh w.r.t. all other variables in the graph.
    */
   override lazy val vars = new Scope(arcset.flatMap {
-    arc => RDFLogic.variables(RDFLogic.atom(arc))
+    arc => RDFLogic.freevars(RDFLogic.atom(arc))
   })
   val qvar = vars.fresh("Q")
 
@@ -166,7 +166,7 @@ extends ConjunctiveKB with RDFXMLTerms {
    */
   def each(s: Term, p: Term, o: Term): Stream[Term] = {
     val goal = RDFLogic.atom(s, p, o)
-    assert(RDFLogic.variables(goal).size == 1)
+    assert(RDFLogic.freevars(goal).size == 1)
 
     for(subst <- solve(goal)) yield {
       // value of 1st/only binding

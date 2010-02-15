@@ -59,7 +59,7 @@ object RDFLogic extends ECProver with RDFXMLTerms {
   def graphFormula(arcs: Iterable[Arc]): ECFormula = {
     val atoms = arcs.toSeq.map { case (s, p, o) => atom(s, p, o) }
     val g = And(atoms)
-    val vars = variables(g)
+    val vars = freevars(g)
     if (vars.isEmpty) g else Exists(vars, g)
   }
 }

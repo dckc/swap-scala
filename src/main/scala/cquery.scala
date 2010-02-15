@@ -11,8 +11,31 @@ import Term.{Subst, matchAll, mksubst}
  * >Conjunctive query in wikipedia</a>
  * 
  */
+trait ConjunctiveQuery[A <: AtomicParts] {
+  /**
+   * Note: treats any variables in the facts as constants.
+   */
+  def solve(goals: Iterable[A], s: Subst,
+	       facts: (() => Stream[A])): Stream[Subst] = {
+    def solve1(goal: A): Stream[Subst] = {
+      facts().flatMap { case fact =>
+	if (fact.rel == goal.rel) {
+	  matchAll(goal.args, fact.args, s).toStream
+	} else Stream.empty }
+    }
 
-abstract class ECProver extends ECLogic {
+    if (goals.isEmpty) Stream.cons(s, Stream.empty) else {
+      solve1(goals.head).flatMap(solve(goals.tail, _, facts))
+    }
+  }
+}
+
+trait AtomicParts {
+  val rel: Symbol
+  val args: List[Term]
+}
+
+abstract class ECProver extends ECLogic with ConjunctiveQuery[Atomic] {
 
   /**
    * Given a set of variables that are taken,
@@ -42,7 +65,7 @@ abstract class ECProver extends ECLogic {
       case (Exists(vf, ff), Exists(vg, gg)) => {
 	val shared = vf filter (vg contains)
 	val (vg2, g2) = if (shared.isEmpty) (vg, gg) else {
-	  val freshfn = scope(variables(f) ++ variables(g))
+	  val freshfn = scope(vf ++ vg)
 	  val (sub, freshvars) = mksubst(shared, Nil, freshfn, Map())
 	  val g3 = subst(gg, sub)
 	  (Set() ++ freshvars ++ (vg filterNot (shared contains)), g3)
@@ -64,43 +87,19 @@ abstract class ECProver extends ECLogic {
     ! proofs(f, g).isEmpty
   }
 
-  def proofs(f: ECFormula, g: ECFormula): Stream[Subst] = {
-    val facts = f match {
+  def atoms(f: ECFormula): List[Atomic] = {
+    f match {
       case atom: Atomic => List(atom)
-      case And(atoms) => atoms
-      case Exists(vars, And(atoms)) => atoms
-    }
-
-    g match {
-      case Exists(vars, gg) => solve(gg, Map(), { () => facts.toStream } )
-      case x: Ground => solve(x, Map(), { () => facts.toStream })
+      case And(atoms) => atoms.toList
+      case Exists(vars, And(atoms)) => atoms.toList
     }
   }
 
-  /**
-   * Note: treats variables in the goal as constants.
-   */
-  def solve(goal: Ground, s: Subst,
-	    facts: (() => Stream[Atomic])): Stream[Subst] = {
-    goal match {
-      case goalatom: Atomic => {
-	facts().flatMap { case fact =>
-	  if (fact.rel == goalatom.rel) {
-	    matchAll(terms(goalatom), terms(fact), s).toStream
-	  } else Stream.empty }
-      }
+  def proofs(f: ECFormula, g: ECFormula): Stream[Subst] = {
+    val facts = atoms(f)
 
-      case And(fmlas) => solveall(fmlas, s, facts)
-    }
+    solve(atoms(g), Map(), { () => facts.toStream } )
   }
-
-  def solveall(goals: Iterable[Atomic], s: Subst,
-	       facts: (() => Stream[Atomic])): Stream[Subst] = {
-    if (goals.isEmpty) Stream.cons(s, Stream.empty) else {
-      solve(goals.head, s, facts).flatMap(solveall(goals.tail, _, facts))
-    }
-  }
-
 }
 
 abstract class ConjunctiveKB extends ECProver {
@@ -114,7 +113,8 @@ abstract class ConjunctiveKB extends ECProver {
     terms.flatMap {case ap: FunctionTerm => Some(ap.fun); case _ => None}
   }
 
+  // kinda odd not to offer solving a collection of atoms together
   def solve(goal: Atomic): Stream[Subst] = {
-    solve(goal, Map(), { () => getData(tokens(goal.args)) } )
+    solve(List(goal), Map(), { () => getData(tokens(goal.args)) } )
   }
 }
