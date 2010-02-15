@@ -7,6 +7,12 @@ import swap.logic1.{Term, Variable}
 
 import scala.annotation.tailrec
 
+trait AtomicParts {
+  val rel: Symbol
+  val args: List[Term]
+}
+
+
 sealed abstract class ECFormula
 case class Exists(vars: Set[Variable], g: And) extends ECFormula
 sealed abstract class Ground extends ECFormula
@@ -35,7 +41,6 @@ class ECLogic extends FormalSystem {
   def axiom(f: Formula) = false
 
   /**
-   * @return: if wff(f), the usual, else f
    * TODO: don't make a new formula unless we have to.
    */
   def subst(f: Atomic, s: Subst): Atomic = {

@@ -30,11 +30,6 @@ trait ConjunctiveQuery[A <: AtomicParts] {
   }
 }
 
-trait AtomicParts {
-  val rel: Symbol
-  val args: List[Term]
-}
-
 abstract class ECProver extends ECLogic with ConjunctiveQuery[Atomic] {
 
   /**

@@ -66,9 +66,9 @@ object Term {
   }
 
   @tailrec
-  def mksubst(todo: Iterable[Variable], done: List[Variable],
-	      fresh: (Variable) => Variable,
-	      s: Subst): (Subst, List[Variable]) = {
+  def mksubst[Out <: Term](todo: Iterable[Variable], done: List[Out],
+	      fresh: (Variable) => Out,
+	      s: Subst): (Subst, List[Out]) = {
     if (todo.isEmpty) (s, done) else {
       val vr = fresh(todo.head)
       mksubst(todo.tail, vr :: done, fresh, s + (todo.head -> vr))

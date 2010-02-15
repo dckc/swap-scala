@@ -2,8 +2,9 @@ package org.w3.swap.logic1cl
 
 import org.w3.swap
 import swap.logic0.{FormalSystem}
-import swap.logic1.{Term, Variable}
+import swap.logic1.{Term, Variable, FunctionTerm}
 import Term.{Subst, matchAll, mksubst}
+import swap.logic1ec.{AtomicParts, ConjunctiveQuery}
 
 /**
  * Coherent Logic
@@ -14,9 +15,13 @@ import Term.{Subst, matchAll, mksubst}
  *
  * See #swig logs
  * http://chatlogs.planetrdf.com/swig/2010-02-12#T23-17-03
+ *
+ * TODO: split out proof generation part
  */
-abstract class CoherentLogic extends FormalSystem {
+abstract class CoherentLogic extends FormalSystem with ConjunctiveQuery[Atomic]{
   type Formula = CLFormula
+
+  def axiom(f: Formula) = false
 
   /**
    * Does the conclusion consist of a single Atom?
@@ -32,7 +37,13 @@ abstract class CoherentLogic extends FormalSystem {
     }
   }
 
-  def closed(f: Formula) = freevars(f).isEmpty
+  def wff(f: Formula) = {
+    f match {
+      case i: Implication => true
+      case _ => freevars(f).isEmpty
+    }
+  }
+
   def freevars(f: CLFormula): Set[Variable] = {
     f match {
       case Implication(c, d) => freevars(c) ++ freevars(d)
@@ -50,24 +61,34 @@ abstract class CoherentLogic extends FormalSystem {
   type State = Set[Atomic] // all closed
 
   def true_in(c: Conjunction, state: State): Boolean = {
-    assert(state.forall(closed _))
-    assert(closed(c))
+    assert(state.forall(wff _))
+    assert(wff(c))
     c.ai.forall(state.contains(_))
   }
 
   def true_in(d: Disjunction, state: State): Boolean = {
-    assert(state.forall(closed _))
-    assert(closed(d))
-    d.ei.exists { case Exists(xi, c) => !solve(c, xi, state).isEmpty }
+    assert(state.forall(wff _))
+    assert(wff(d))
+    d.ei.exists { case Exists(xi, c) => !solve(c, state).isEmpty }
   }
 
   def fresh(pattern: Variable): Variable
+  def parameter(pattern: Variable): FunctionTerm
 
-  def subst(c: Conjunction, s: Subst): Conjunction // TODO
-  def subst(d: Disjunction, s: Subst): Disjunction // TODO
+  def subst(c: Conjunction, s: Subst): Conjunction = {
+    Conjunction(c.ai.map {
+      a => Atomic(a.rel, a.args.map(_.subst(s)))
+    })
+  }
+
+  def subst(d: Disjunction, s: Subst): Disjunction = {
+    Disjunction(d.ei.map {
+      e => Exists(e.xi, subst(e.c, s))
+    })
+  }
 
   def closed_instance(c: Conjunction): Conjunction = {
-    val (s, vars) = mksubst(freevars(c), Nil, fresh _, Map())
+    val (s, vars) = mksubst(freevars(c), Nil, parameter, Map())
     subst(c, s)
   }
 
@@ -91,16 +112,20 @@ abstract class CoherentLogic extends FormalSystem {
    * Loops forever if not, as ECLogic is only semi-decidable. :-/
    */
   def consequence_bf(t: Theory, x: State, d: Disjunction): Boolean = {
-    assert(x.forall(closed _))
-    assert(closed(d))
+    assert(x.forall(wff _))
+    assert(wff(d))
+
+    println("@@search conjecture: " + d)
 
     def search(x: State): Boolean = {
+      println("@@search state: " + x)
+
       if (true_in(d, x)) true // base case
       else { // induction step
 	val d0n = for {
 	  Implication(c, d) <- t
-	  solution <- solve(c, freevars(c), x)
-	  consequently = assert(true_in(c, x))
+	  solution <- solve(c, x)
+	  consequently = assert(true_in(subst(c, solution), x))
 	  di = subst(d, solution)
 	  if !true_in(di, x)
 	} yield di
@@ -113,10 +138,18 @@ abstract class CoherentLogic extends FormalSystem {
     search(x)
   }
 
-  // TODO: factor out Conjunctive Query as a trait
-  type Subst = Map[Variable, Term]
-  def solve(c: Conjunction, xi: Set[Variable],
-	    state: Set[Atomic]): Stream[Subst] // TODO
+  def solve(c: Conjunction, state: Set[Atomic]): Stream[Subst] = {
+    solve(c.ai, Map(), {() => state.toStream})
+  }
+
+  
+  // TODO
+  def appeal_step_ok(x: Appeal, thms: List[Formula]): Boolean = false
+  override val methods = List[Symbol]()
+
+  override def rule(method: Symbol): Rule = {     // TODO
+    case (premises, conclusion) => false
+  }
 }
 
 /**
@@ -126,5 +159,6 @@ sealed abstract class CLFormula
 case class Implication(c: Conjunction, d: Disjunction) extends CLFormula
 case class Conjunction(ai: List[Atomic]) extends CLFormula
 case class Atomic(rel: Symbol, args: List[Term]) extends CLFormula
+   with AtomicParts
 case class Disjunction(ei: List[Exists]) extends CLFormula
 case class Exists(xi: Set[Variable], c: Conjunction) extends CLFormula
