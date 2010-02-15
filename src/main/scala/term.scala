@@ -65,6 +65,17 @@ object Term {
     }
   }
 
+  @tailrec
+  def mksubst(todo: Iterable[Variable], done: List[Variable],
+	      fresh: (Variable) => Variable,
+	      s: Subst): (Subst, List[Variable]) = {
+    if (todo.isEmpty) (s, done) else {
+      val vr = fresh(todo.head)
+      mksubst(todo.tail, vr :: done, fresh, s + (todo.head -> vr))
+    }
+  }
+
+
   def unify(tt1: Term, tt2: Term, s: Subst): Option[Subst] = {
     val t1 = lookup(tt1, s)
     val t2 = lookup(tt2, s)

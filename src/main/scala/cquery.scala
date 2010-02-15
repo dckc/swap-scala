@@ -4,7 +4,7 @@ import scala.annotation.tailrec
 
 import org.w3.swap
 import swap.logic1.{Term, FunctionTerm, Variable}
-import Term.{Subst, matchAll}
+import Term.{Subst, matchAll, mksubst}
 
 /**
  * cf. <a href="http://en.wikipedia.org/wiki/Conjunctive_query"
@@ -13,16 +13,6 @@ import Term.{Subst, matchAll}
  */
 
 abstract class ECProver extends ECLogic {
-
-  // odd... can't @tailrec
-  def mksubst(todo: Iterable[Variable], done: List[Variable],
-	      fresh: (Variable) => Variable,
-	      s: Subst): (Subst, List[Variable]) = {
-    if (todo.isEmpty) (s, done) else {
-      val vr = fresh(todo.head)
-      mksubst(todo.tail, vr :: done, fresh, s + (todo.head -> vr))
-    }
-  }
 
   /**
    * Given a set of variables that are taken,
