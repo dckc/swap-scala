@@ -12,7 +12,8 @@ import swap.sexp.{Atom, Cons, SExp}
 import SExp.fromSeq
 
 import swap.logic1cl.{CoherentLogic,
-		      Implication, Conjunction, Disjunction, Exists, Atomic}
+		      Implication, Conjunction, Disjunction, Exists, Atomic,
+		    Implies, Or, And}
 
 class TestLogic(t: List[Implication]) extends CoherentLogic(t) {
   var i = 0
@@ -41,8 +42,11 @@ class TestLogic(t: List[Implication]) extends CoherentLogic(t) {
 	case Nil => Nil
 	case a0 :: a1n => {
 	  val d2 = recur(a0.subproofs ++ a1n)
+	  /* disabling this while we work with assumptions...
 	  if (d2.exists { _.conclusion == a0.conclusion }) d2
 	  else a0 :: d2
+	  */
+	  a0 :: d2
 	}
       }
     }
@@ -76,9 +80,9 @@ class TestLogic(t: List[Implication]) extends CoherentLogic(t) {
 
   def quote(f: Formula): SExp = {
     f match {
-      case Implication(c, d) => fromSeq(List('implies, quote(c), quote(d)))
-      case Conjunction(ai) => fromSeq('and :: ai.map(quote _))
-      case Disjunction(ei) => fromSeq('or :: ei.map(quote _))
+      case Implies(c, d) => fromSeq(List('implies, quote(c), quote(d)))
+      case And(ai) => fromSeq('and :: ai.map(quote _))
+      case Or(ei) => fromSeq('or :: ei.map(quote _))
       case Exists(xi, g) => fromSeq(List('exists, quote(xi.toList), quote(g) ))
       case Atomic(rel, args) => Cons(Atom(rel), quote(args))
     }
@@ -96,125 +100,54 @@ class CoherentLogicMisc extends Spec with ShouldMatchers {
   describe("coherent logic breadth-first consequence"){
     implicit def tovar(s: Symbol) = Var(s)
     implicit def toterm(s: String) = Constant(Atom(s))
-    implicit def a1(a: Atomic) = List(a)
     def app(s: Symbol, terms: Term*) = Atomic(s, terms.toList)
-
-    // move these to logic1cl?
-    implicit def c1(a: Atomic) = Conjunction(List(a))
-    implicit def e1(a: Atomic) = Exists(Set.empty, a)
-    implicit def d1(a: Atomic) = Disjunction(List(a))
-    implicit def i1(d: Disjunction) = Implication(Conjunction(Nil), d)
-    implicit def i2(a: Atomic) = Implication(Conjunction(Nil), a)
 
     it("should handle the socrates inference"){
       // all men are mortal
       val theory = List(
-	Implication(app('Man, 'x), app('Mortal, 'x)) )
+	Implies(app('Man, 'x), app('Mortal, 'x)) )
 	
       val state = Set( app('Man, "socrates") )
       val conjecture = app('Mortal, "socrates")
       val l = new TestLogic(theory)
       val pfs = state.toList.map(l.Appeal('THEOREM, _, Nil, Nil))
-      val pf = l.derive_bf(state, pfs, conjecture).get
+      val pf = l.consequence(pfs, conjecture).get
       l.quotepf(l.linearize(pf)).toString() should equal (
 """((1 (Man '"socrates" ) THEOREM () () )
-  (2 (and (Man '"socrates" ) ) AND_INTRO (1 ) () )
+  (2 (implies (Man x ) (Mortal x ) ) AXIOM () () )
   (3
-    (implies (and (Man x ) ) (or (exists () (and (Mortal x ) ) ) ) )
-    AXIOM
-    ()
-    ()
-    )
-  (4
-    (implies
-      (and (Man '"socrates" ) )
-      (or (exists () (and (Mortal '"socrates" ) ) ) )
-      )
+    (implies (Man '"socrates" ) (Mortal '"socrates" ) )
     INSTANTIATION
-    (3 )
+    (2 )
     (Map(Var('x) -> Constant("socrates")) )
     )
-  (5
-    (or (exists () (and (Mortal '"socrates" ) ) ) )
-    MODUS_PONENS
-    (4 2 )
-    ()
-    )
-  (6 (exists () (and (Mortal '"socrates" ) ) ) CONTRACTION (5 ) () )
-  (7 (and (Mortal '"socrates" ) ) EXISTS_ELIM (6 ) (Map() ) )
-  (8 (Mortal '"socrates" ) ERASURE (7 ) () )
+  (4 (Mortal '"socrates" ) MODUS_PONENS (3 1 ) () )
   )"""
 )
     }
 
     it("should handle the example in section 3 of the paper"){
       val theory: List[Implication] =
-	List(Implication(app('q, 'x), app('p)),
-	     Disjunction(List(app('p),
-			      Exists(Set(Var('x)), app('q, 'x)) )) )
-      val conjecture: Disjunction = app('p)
+	List(Implies(app('q, 'x), app('p)),
+	     Or(List(app('p),
+		     Exists(Set(Var('x)), app('q, 'x)) )) )
+      val conjecture = app('p)
       val l = new TestLogic(theory)
-      val pf = l.derive_bf(Set.empty, Nil, conjecture).get
+      val pf = l.consequence(Nil, conjecture).get
       l.quotepf(l.linearize(pf)).toString() should equal (
-"""((1 (and ) AND_INTRO () () )
-  (2
-    (implies
-      (and )
-      (or (exists () (and (p ) ) ) (exists (x ) (and (q x ) ) ) )
-      )
-    AXIOM
-    ()
-    ()
-    )
-  (3
-    (implies
-      (and )
-      (or (exists () (and (p ) ) ) (exists (x ) (and (q x ) ) ) )
-      )
-    INSTANTIATION
-    (2 )
-    (Map() )
-    )
+"""((1 (exists (x ) (q x ) ) ASSUMPTION () () )
+  (2 (q (x2 ) ) EXISTS_ELIM (1 ) (Map(Var('x) -> App('x2,List())) ) )
+  (3 (implies (q x ) (p ) ) AXIOM () () )
   (4
-    (or (exists () (and (p ) ) ) (exists (x ) (and (q x ) ) ) )
-    MODUS_PONENS
-    (3 1 )
-    ()
-    )
-  (5 (exists (x ) (and (q x ) ) ) CONTRACTION (4 ) () )
-  (6
-    (and (q (x1 ) ) )
-    EXISTS_ELIM
-    (5 )
-    (Map(Var('x) -> App('x1,List())) )
-    )
-  (7 (q (x1 ) ) ERASURE (6 ) () )
-  (8 (and (q (x1 ) ) ) AND_INTRO (7 ) () )
-  (9
-    (implies (and (q x ) ) (or (exists () (and (p ) ) ) ) )
-    AXIOM
-    ()
-    ()
-    )
-  (10
-    (implies (and (q (x1 ) ) ) (or (exists () (and (p ) ) ) ) )
+    (implies (q (x2 ) ) (p ) )
     INSTANTIATION
-    (9 )
-    (Map(Var('x) -> App('x1,List())) )
+    (3 )
+    (Map(Var('x) -> App('x2,List())) )
     )
-  (11 (or (exists () (and (p ) ) ) ) MODUS_PONENS (10 8 ) () )
-  (12 (exists () (and (p ) ) ) CONTRACTION (11 ) () )
-  (13 (and (p ) ) EXISTS_ELIM (12 ) (Map() ) )
-  (14 (p ) ERASURE (13 ) () )
-  (15 (and (p ) ) AND_INTRO (14 ) () )
-  (16 (exists () (and (p ) ) ) EXISTS_INTRO (15 ) (Map() ) )
-  (17 (or (exists () (and (p ) ) ) ) OR_INTRO (16 ) () )
-  (18 (exists () (and (p ) ) ) CONTRACTION (4 ) () )
-  (19 (and (p ) ) EXISTS_ELIM (18 ) (Map() ) )
-  (20 (p ) ERASURE (19 ) () )
-  (21 (and (p ) ) AND_INTRO (20 ) () )
-  (22 (exists () (and (p ) ) ) EXISTS_INTRO (21 ) (Map() ) )
-  (23 (or (exists () (and (p ) ) ) ) OR_INTRO (22 17 ) () )
+  (5 (p ) MODUS_PONENS (4 2 ) () )
+  (6 (p ) ASSUMPTION () () )
+  (7 (or (p ) (exists (x ) (q x ) ) ) AXIOM () () )
+  (8 (p ) OR_INTRO (7 6 5 ) () )
   )"""
 )
     }
@@ -222,7 +155,7 @@ class CoherentLogicMisc extends Spec with ShouldMatchers {
     it("would loop indefinely for a non-consequence :-/"){
       // all men are mortal
       val theory = List(
-	Implication(Atomic('Man, List('x)), Atomic('Mortal, List('x))) )
+	Implies(Atomic('Man, List('x)), Atomic('Mortal, List('x))) )
 	
       val state = Set( Atomic('Man, List("socrates")) )
       val conjecture = Atomic('Mortal, List("bob"))
