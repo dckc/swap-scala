@@ -41,7 +41,7 @@ class TestLogic(t: List[Implication]) extends CoherentLogic(t) {
 	case Nil => Nil
 	case a0 :: a1n => {
 	  val d2 = recur(a0.subproofs ++ a1n)
-	  if (d2 contains a0) d2
+	  if (d2.exists { _.conclusion == a0.conclusion }) d2
 	  else a0 :: d2
 	}
       }
@@ -143,19 +143,6 @@ class CoherentLogicMisc extends Spec with ShouldMatchers {
   (6 (exists () (and (Mortal '"socrates" ) ) ) CONTRACTION (5 ) () )
   (7 (and (Mortal '"socrates" ) ) EXISTS_ELIM (6 ) (Map() ) )
   (8 (Mortal '"socrates" ) ERASURE (7 ) () )
-  (9 (and (Mortal '"socrates" ) ) AND_INTRO (8 ) () )
-  (10
-    (exists () (and (Mortal '"socrates" ) ) )
-    EXISTS_INTRO
-    (9 )
-    (Map() )
-    )
-  (11
-    (or (exists () (and (Mortal '"socrates" ) ) ) )
-    OR_INTRO
-    (10 )
-    ()
-    )
   )"""
 )
     }
