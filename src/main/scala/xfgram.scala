@@ -30,9 +30,14 @@ class XMLFormalGrammar extends RegexParsers {
    */
   def id: Parser[String] = "[a-zA-Z][^\\s:?*()]*".r
 
-  def alternatives: Parser[Alternatives] = repsep(sequence, "|") ^^ {
-    case seqs => Alternatives(seqs)
-  }
+  def alternatives: Parser[Alternatives] = (
+    sequence ~ ("|" ~> alternatives) ^^ {
+      case CharClass(l1) ~ CharClass(l2) => CharClass(l1 ++ l2)
+      case hd ~ tl => Alternatives(hd, tl)
+    }
+    | sequence ^^ { case s => s }
+    | success(Choice(Nil))
+  )
 
   def sequence: Parser[Sequence] = (
     x_star ~ sequence ^^ {
@@ -45,10 +50,20 @@ class XMLFormalGrammar extends RegexParsers {
   def item = lit | range | group | id ^^ { case i => ID(i) }
 
   def lit: Parser[Item] = (
-    "\"[^\"]+\"".r ^^ { case l => Lit(chop(l, 1)) }
-    | "'[^\']+'".r ^^ { case l => Lit(chop(l, 1)) }
+    "(\"[^\"]+\")|('[^\']+')".r ^^ {
+      case l if l.length == 3 => {
+	val c = l.charAt(1)
+	CharClass(List((c, c)))
+      }
+      case l => Lit(chop(l, 1))
+    }
+
     | "#x([0-9A-F]+)".r ^^ {
-      case xxn => Lit(parseInt(xxn.substring(2), 16).toChar.toString) }
+      case xxn => {
+	val c = parseInt(xxn.substring(2), 16).toChar
+	CharClass(List((c, c)))
+      }
+    }
   )
   protected def chop(s: String, i: Int) = s.substring(i, s.length - i)
 
@@ -56,10 +71,14 @@ class XMLFormalGrammar extends RegexParsers {
   val rangeA_B = "\\[(.)-(.)\\]".r
 
   def range: Parser[Item] = (
-    range2_4 ^^ { case range2_4(lo, hi) => CharClass(parseInt(lo, 16).toChar,
-						     parseInt(hi, 16).toChar) }
-    | rangeA_B ^^ { case rangeA_B(lo, hi) => CharClass(lo.charAt(0),
-						       hi.charAt(0)) }
+    range2_4 ^^ {
+      case range2_4(lo, hi) =>
+	val lohi = (parseInt(lo, 16).toChar, parseInt(hi, 16).toChar)
+	CharClass(List(lohi))
+    }
+    | rangeA_B ^^ {
+      case rangeA_B(lo, hi) => CharClass(List((lo.charAt(0), hi.charAt(0))))
+    }
   )
 
   def group: Parser[Item] = "(" ~> alternatives <~ ")" ^^ {
@@ -90,28 +109,35 @@ object XMLName {
 
 sealed abstract class Expr
 
-sealed abstract class Alternatives extends Expr
-case class Choice(ei: List[Sequence]) extends Alternatives
+sealed abstract class Alternatives extends Expr {
+  def choices: List[Sequence]
+}
+case class Choice(ei: List[Sequence]) extends Alternatives {
+  def choices = ei
+}
 object Alternatives {
-  def apply(seqs: List[Sequence]): Alternatives = {
-    if (seqs.length == 1) seqs(0) else {
-      val items = seqs.map {
-	case i: Item => i
-	case x => Group(x)
-      }
-      Choice(items)
+  def apply(hd: Sequence, tl: Alternatives): Alternatives = {
+    val hdi = hd match {
+      case i: Item => i
+      case x => Group(x)
     }
-    
+
+    tl.choices match {
+      case Nil => hd
+      case more => Choice(hdi :: more)
+    }
   }
 }
 
 sealed abstract class Sequence extends Alternatives {
+  override def choices = List(this)
   def items: List[Item]
 }
 case class Concat(ei: List[Item]) extends Sequence{
   require(ei.length != 1)
   def items = ei
 }
+
 object Sequence {
   def concat(s1: Sequence, s2: Sequence): Sequence = {
     val l = s1.items ++ s2.items
@@ -126,6 +152,6 @@ case class Rep0n(e: Item) extends Item
 //case class Rep1(e: Item) extends Sequence
 case class ID(i: String) extends Item
 case class Lit(s: String) extends Item
-case class CharClass(lo: Char, hi: Char) extends Item
-case class Except(all: Item, but: Item) extends Item
+case class CharClass(ranges: List[(Char, Char)]) extends Item
+//case class Except(all: Item, but: Item) extends Item
 case class Group(e: Expr) extends Item
