@@ -47,7 +47,7 @@ class XMLFormalGrammar extends RegexParsers {
   def lit: Parser[Item] = (
     "(\"[^\"]+\")|('[^\']+')".r ^^ {
       case l if l.length == 3 => {
-	val c = l.charAt(1)
+	val c = l.charAt(1).toInt
 	CharClass(List((c, c)))
       }
       case l => Lit(chop(l, 1))
@@ -68,7 +68,7 @@ class XMLFormalGrammar extends RegexParsers {
   def range: Parser[Item] = (
     range2_4 ^^ {
       case range2_4(lo, hi) =>
-	val lohi = (parseInt(lo, 16).toChar, parseInt(hi, 16).toChar)
+	val lohi = (parseInt(lo, 16), parseInt(hi, 16))
 	CharClass(List(lohi))
     }
     | rangeA_B ^^ {
@@ -103,6 +103,7 @@ object EBNF {
   /**
    * Replace non-terminals by their rule bodies.
    * @return: None if there's a loop, i.e. if the Expr is not regular
+   * TODO: take a list of names to make into capturing groups
    */
   def regex(e: Expr, g: Map[Symbol, Expr]): Option[Expr] = {
     def recur(e: Expr, seen: List[Symbol]): Option[Expr] = {
@@ -150,6 +151,52 @@ object EBNF {
     recur(e, Nil)
   }
 
+  /**
+   * Regular expression notation for this expression.
+   * Turns IDs into ""
+   * TODO: capturing vs non-capturing groups
+   */
+  def re(e: Expr): String = e match {
+    case ID(i) => ""
+    case Choice(ei) =>
+      ei.map {
+	case i: Item => re(i)
+	case x => re(Group(x))
+      }.mkString("|")
+
+    case Concat(ei) =>
+      ei.map(re _).mkString("")
+
+    case Rep0n(e) =>
+      re(e) + "*"
+
+    case Group(e) =>
+      "(?:" + re(e) + ")"
+
+    case CharClass(ranges) =>
+      (ranges.map{
+	case (lo, hi) if lo == hi => re_ch(lo)
+	case (lo, hi) => re_ch(lo) + "-" + re_ch(hi)
+      }).mkString("[", "", "]")
+
+    case Lit(s) => s.map{c => re_ch(c.toInt)}.mkString("") // TODO: use grind
+  }
+
+  protected def re_ch(ch: Int): String = {
+    val s = ch.toChar.toString
+    if (s.matches("[a-zA-Z0-9_:@#%]")) s
+    else if (ch < 0x100) "\\x%02x" format ch
+    else if (ch < 0x10000) "\\u%04x" format ch
+    else {
+      /* should do something like this for surrogate pairs...
+       * but they don't work in [] things
+      val ch2 = java.lang.Character.toChars(ch)
+      re_ch(ch2(0).toInt) + re_ch(ch2(1).toInt)
+      */
+      "\\uffff"
+    }
+  }
+
   def simplify(e: Expr) = e match {
     case a: Alternatives => choose(a, Alternatives(Nil))
   }
@@ -157,12 +204,15 @@ object EBNF {
   def choose(a1: Alternatives, a2: Alternatives): Alternatives = {
     a1.choices ++ a2.choices match {
       case Lit(s) :: CharClass(l2) :: rest if s.length == 1 => {
-	val c = s.charAt(0)
+	val c = s.charAt(0).toInt
 	choose(CharClass((c, c) :: l2), Alternatives(rest))
       }
 
       case CharClass(l1) :: CharClass(l2) :: rest =>
 	choose(CharClass(l1 ++ l2), Alternatives(rest))
+
+      case Group(a11: Alternatives) :: rest =>
+	choose(a11, Alternatives(rest))
 
       case choices =>
 	Alternatives(choices.map(concat(_, Concat(Nil))))
@@ -173,8 +223,8 @@ object EBNF {
     (s1.items ++ s2.items) match {
       case Lit(s1) :: Lit(s2) :: rest =>
 	concat(Lit(s1 + s2), Sequence(rest))
-      case CharClass(List((lo, hi))) :: rest if lo == hi =>
-	concat(Lit(lo.toString), Sequence(rest))
+      case CharClass(List((lo, hi))) :: rest if lo < 0x10000 && lo == hi =>
+	concat(Lit(lo.toChar.toString), Sequence(rest))
       case items => Sequence(items)
     }
   }
@@ -195,7 +245,8 @@ object XMLName {
 }
 
 
-sealed abstract class Expr
+sealed abstract class Expr {
+}
 
 sealed abstract class Alternatives extends Expr {
   def choices: List[Sequence]
@@ -238,6 +289,6 @@ case class Rep0n(e: Item) extends Item
 //case class Rep1(e: Item) extends Sequence
 case class ID(i: Symbol) extends Item
 case class Lit(s: String) extends Item
-case class CharClass(ranges: List[(Char, Char)]) extends Item
+case class CharClass(ranges: List[(Int, Int)]) extends Item
 //case class Except(all: Item, but: Item) extends Item
 case class Group(e: Expr) extends Item
