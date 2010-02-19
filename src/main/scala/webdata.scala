@@ -1,6 +1,7 @@
 package org.w3.swap.webdata
 
 import java.io.InputStreamReader
+import java.net.URLConnection
 import scala.xml.XML
 import scala.util.parsing.combinator.Parsers
 
@@ -19,64 +20,92 @@ import SExp.fromSeq
  * WebData can read RDF in various formats using rdflogic terms as nodes.
  */
 object WebData extends TermNode {
+  val web0 = new URLOpener()
 
-  // TODO: conneg
-  // TODO: use a callback rather than Stream[Arc]
-  def loadRDFXML(addr: String): Stream[Arc] = {
+  final val RDFXML = "application/rdf+xml"
+  final val HTML = "text/html"
+  final val TURTLE = "text/turtle"
+  final val SPARQL = "application/sparql-query"
+  final val XHTML = "application/xhtml+xml"
+  final val RDFa_types = List(HTML, XHTML).mkString(", ")
+
+  final val NoParams = "\\s*([^/]+/[^\\s;,]+)".r
+
+  def loadData(web: URLOpener, addr: String, mediatype: String): Stream[Arc] = {
     val base = cwdbased(addr)
-    val e = XML.load(base)
-    XMLtoRDFlogic.getArcs(e, base)
+
+    val (reader, conn) = web.open(addr, mediatype)
+    NoParams.findFirstIn(conn.getContentType) match {
+      case None => throw new Exception("@@goofy media type syntax")
+      case Some(ct) => ct.toLowerCase match {
+	case RDFXML =>
+	  val e = XML.load(reader)
+          // TODO: use a callback rather than Stream[Arc]
+          XMLtoRDFlogic.getArcs(e, base)
+
+	case HTML | XHTML =>
+	  val e = XML.load(reader)
+          val baseh = e \ "head" \ "base" \ "@href"
+	  RDFaParser.getArcs(e, if (base.isEmpty) base else baseh.text)
+
+	case TURTLE =>
+	  val p = new TurtleParser(base)
+          p.arcs(p.parseAll(p.turtleDoc, reader))
+
+	case other => throw new Exception("@@unexpected media type: " + other)
+      }
+    }
   }
 
-  protected def content(addr: String): InputStreamReader = {
-    val conn = new java.net.URL(addr).openConnection()
-    new InputStreamReader(conn.getInputStream())
-  }
 
   /**
    * @throws IOException if openConnection(addr) throws one
    */
-  def loadNT(addr: String): Stream[Arc] = {
+  def loadNT(web: URLOpener, addr: String): Stream[Arc] = {
     val p = new NTriplesParser()
-    p.arcs(p.parseAll(p.ntripleDoc, content(addr)))
+    p.arcs(p.parseAll(p.ntripleDoc, web.open_any(addr)))
   }
 
   /**
    * @throws IOException if openConnection(addr) throws one
    */
-  def loadTurtle(addr: String): Stream[Arc] = {
-    val abs = cwdbased(addr)
-    loadTurtle(abs, abs)
-  }
-
-  /**
-   * @throws IOException if openConnection(addr) throws one
-   */
-  def loadTurtle(addr: String, base: String): Stream[Arc] = {
+  def loadTurtle(web: URLOpener, addr: String, base: String): Stream[Arc] = {
     val p = new TurtleParser(base)
-    p.arcs(p.parseAll(p.turtleDoc, content(addr)))
+    p.arcs(p.parseAll(p.turtleDoc, web.open(addr, TURTLE)._1))
   }
+  def loadTurtle(addr: String): Stream[Arc] = loadTurtle(web0, addr, addr)
 
-  def loadSPARQL(addr: String): Stream[Arc] = {
-    val p = new SPARQLParser(addr)
+  def loadSPARQL(web: URLOpener, addr: String, base: String): Stream[Arc] = {
+    val p = new SPARQLParser(base)
 
-    p.arcs(p.parseAll(p.AskQuery, content(addr)))
+    p.arcs(p.parseAll(p.AskQuery, web.open(addr, SPARQL)._1))
   }
+  def loadSPARQL(addr: String): Stream[Arc] = loadSPARQL(web0, addr, addr)
     
-  def loadRDFa(addr: String): Stream[Arc] = {
-    // TODO: suggest media type with Accept: headers; check Content-type
-    val e = XML.load(addr)
-    val b1 = cwdbased(addr)
-    val base = e \ "head" \ "base" \ "@href"
-    RDFaParser.getArcs(e, if (base.isEmpty) b1 else base.text)
-  }
-
   /**
    * Absolutize a URI reference w.r.t. cwd.
    */
   def cwdbased(ref: String): String = {
     val cwd = java.lang.System.getProperty("user.dir")
     new java.io.File(cwd).toURI().resolve(ref).toString()
+  }
+}
+
+/**
+ * a la python's URLOpener
+ * hint: conn.getContentType()
+ */
+class URLOpener {
+  def open(addr: String, accept: String): (InputStreamReader, URLConnection) = {
+    val conn = new java.net.URL(addr).openConnection()
+    conn.setRequestProperty("accept", accept)
+    val reader = new InputStreamReader(conn.getInputStream())
+    (reader, conn)
+  }
+
+  def open_any(addr: String): InputStreamReader = {
+    val conn = new java.net.URL(addr).openConnection()
+    new InputStreamReader(conn.getInputStream())
   }
 }
 

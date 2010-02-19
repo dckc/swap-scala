@@ -42,14 +42,14 @@ object N3Tool {
   }
 
   def readRDF(addr: String) {
-    val arcs = WebData.loadRDFXML(addr)
+    val arcs = WebData.loadData(WebData.web0, addr, WebData.RDFXML)
     val q = RDFQ.quote(RDFLogic.graphFormula(arcs))
 
     q.doc.format(72, stdout)
   }
 
   def readRDFa(addr: String) {
-    val arcs = WebData.loadRDFa(addr)
+    val arcs = WebData.loadData(WebData.web0, addr, WebData.RDFa_types)
     val q = RDFQ.quote(RDFLogic.graphFormula(arcs))
     q.doc.format(72, stdout)
   }

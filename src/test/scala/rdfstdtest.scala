@@ -1,7 +1,7 @@
 package org.w3.swap.test
 
 import org.w3.swap
-import swap.webdata.WebData
+import swap.webdata.{WebData, URLOpener}
 import swap.logic1.Term
 import swap.logic1ec.ECFormula
 import swap.rdflogic.{RDFXMLTerms, Name, Plain}
@@ -60,7 +60,7 @@ abstract class TestSuite(val manifest: Graph) extends RDFXMLTerms {
   def run(): Stream[(Term, String, TestResult)]
 }
 
-class EntailmentTestSuite(override val manifest: Graph)
+class EntailmentTestSuite(override val manifest: Graph, web: URLOpener)
 extends TestSuite(manifest) {
   import swap.logic1ec.And
   import swap.rdflogic.{RDFLogic => RL }
@@ -143,9 +143,9 @@ extends TestSuite(manifest) {
       case Name(addr) => {
 	if (manifest.contains(u, rdf_type,
 			      testSchema.`RDF-XML-Document`) ) {
-	  WebData.loadRDFXML(addr)
+	  WebData.loadData(web, addr, WebData.RDFXML)
 	} else if (manifest.contains(u, rdf_type, testSchema.`NT-Document`)) {
-	  WebData.loadNT(addr)
+	  WebData.loadNT(web, addr)
 	} else {
 	  println("@@unknown document type:  for test document " + u)
 	  println(manifest.each(u, rdf_type, what).mkString("types:",
@@ -163,7 +163,8 @@ extends TestSuite(manifest) {
   }
 }
 
-class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
+class RDFaTestSuite(override val manifest: Graph, web: URLOpener)
+extends TestSuite(manifest) {
   import swap.rdflogic.{RDFLogic => RL}
   import swap.webdata.RDFQ
 
@@ -187,8 +188,11 @@ class RDFaTestSuite(override val manifest: Graph) extends TestSuite(manifest) {
 				 testDescription.approved))
  	    (test, titlestr, BadTestData("test not approved"))
 	  else {
-	    val data = RL.graphFormula(WebData.loadRDFa(inaddr))
-	    val pattern = RL.graphFormula(WebData.loadSPARQL(outaddr))
+	    val data = RL.graphFormula(WebData.loadData(web, inaddr,
+							WebData.RDFa_types))
+	    val pattern = RL.graphFormula(WebData.loadSPARQL(web,
+							     outaddr,
+							     outaddr))
 
 	    if (pattern == null) {
 	      (test, titlestr, UnsupportedFeature("SPARQL parse failure"))
@@ -216,10 +220,12 @@ class RDFaExample(indoc: String, outdoc: String) {
   import swap.webdata.RDFQ
 
   def run(): Stream[(Term, String, TestResult)] = {
+    val web = new URLOpener()
     val base = WebData.cwdbased(indoc)
-    val actual = RL.graphFormula(WebData.loadRDFa(base))
+    val actual = RL.graphFormula(WebData.loadData(web, base,
+						  WebData.RDFa_types))
     val expected = RL.graphFormula(
-      WebData.loadTurtle(WebData.cwdbased(outdoc), base))
+      WebData.loadTurtle(web, WebData.cwdbased(outdoc), base))
     val aTest = swap.rdflogic.XMLVar("test", Some(this.hashCode()))
 
     val result = RL.entails(actual, expected) && RL.entails(expected, actual)
@@ -236,14 +242,17 @@ class RDFaExample(indoc: String, outdoc: String) {
 
 object Runner {
   def main(args: Array[String]): Unit = {
-    lazy val manifest = new Graph(WebData.loadRDFXML(args(1)))
+    lazy val mirror = new MirrorOpener(WebData.cwdbased(args(1)),
+				       WebData.cwdbased(args(2)))
+    lazy val manifest = new Graph(WebData.loadData(mirror, args(1),
+						   WebData.RDFXML))
 
     val results = args(0) match {
-      case "--entailment" => new EntailmentTestSuite(manifest).run()
-      case "--rdfa" => new RDFaTestSuite(manifest).run()
+      case "--entailment" => new EntailmentTestSuite(manifest, mirror).run()
+      case "--rdfa" => new RDFaTestSuite(manifest, mirror).run()
       case "--rdfax" => new RDFaExample(args(1), args(2)).run()
       case _ => {
-	println("Usage: rdfstdtest --entailment|--rdfa manifest")
+	println("Usage: rdfstdtest --entailment|--rdfa manifest mirror")
 	Stream.empty
       }
     }
@@ -258,3 +267,24 @@ object Runner {
   }
 }
 
+/**
+ * Load resources from a local copy.
+ * @param global: URI of original resource
+ * @param local: URI of mirror of global
+ */
+class MirrorOpener(val global: String, val local: String)
+extends URLOpener{
+  import java.net.{URI, URL}
+  import java.io.InputStreamReader
+
+  protected val gu = new URI(global).resolve("./")
+  protected val lu = new URI(local).resolve("./")
+
+  def open(addr: String): InputStreamReader = {
+    val actual = lu.resolve(gu.relativize(new URI(addr)))
+
+    val conn = actual.toURL.openConnection()
+    new InputStreamReader(conn.getInputStream())
+  }
+
+}
