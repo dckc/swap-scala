@@ -20,7 +20,7 @@ import SExp.fromSeq
  * WebData can read RDF in various formats using rdflogic terms as nodes.
  */
 object WebData extends TermNode {
-  val web0 = new URLOpener()
+  val web0 = CWDOpener
 
   final val APP_XML = "application/xml"
   final val RDFXML = "application/rdf+xml"
@@ -32,63 +32,72 @@ object WebData extends TermNode {
 
   final val NoParams = "\\s*([^/]+/[^\\s;,]+)".r
 
-  def loadData(web: URLOpener, addr: String, mediatype: String): Stream[Arc] = {
-    val base = cwdbased(addr)
+  val media_types = Map(
+    (RDFXML -> loadRDFXML _),
+    (APP_XML -> loadRDFXML _),
+    (HTML -> loadRDFa _),
+    (XHTML -> loadRDFa _),
+    (TURTLE -> loadTurtle _),
+    (SPARQL -> loadSPARQL _) )
 
-    val (reader, conn) = web.open(addr, mediatype)
+  val extensions = Map(
+    (".rdf" -> loadRDFXML _),
+    (".xml" -> loadRDFXML _),
+    (".html" -> loadRDFa _),
+    (".xhtml" -> loadRDFa _),
+    (".n3" -> loadTurtle _), // for now
+    (".ttl" -> loadTurtle _),
+    (".nt" -> loadNT _) )
+
+  /**
+   * @throws IOException if openConnection(addr) throws one
+   */
+  def loadData(web: URLOpener, addr: String, mediatype: String): Stream[Arc] = {
+    val base = web.abs(addr)
+
+    val (reader, conn) = web.open(base, mediatype)
     NoParams.findFirstIn(conn.getContentType) match {
       case None => throw new Exception("@@goofy media type syntax")
-      case Some(ct) => ct.toLowerCase match {
-	case RDFXML | APP_XML =>
-	  val e = XML.load(reader)
-          // TODO: use a callback rather than Stream[Arc]
-          XMLtoRDFlogic.getArcs(e, base)
-
-	case HTML | XHTML =>
-	  val e = XML.load(reader)
-          val baseh = e \ "head" \ "base" \ "@href"
-	  RDFaParser.getArcs(e, if (base.isEmpty) base else baseh.text)
-
-	case TURTLE =>
-	  val p = new TurtleParser(base)
-          p.arcs(p.parseAll(p.turtleDoc, reader))
-
-	case other => throw new Exception("@@unexpected media type: " + other)
+      case Some(ct) => {
+	val loader = media_types.getOrElse(ct, {
+	  val dot = base.lastIndexOf(".")
+	  val ext = if (dot >= 0) base.substring(dot) else ""
+	  extensions.getOrElse(ext, loadRDFXML _)
+	})
+	loader(reader, base)
       }
     }
   }
 
+  def loadRDFXML(content: InputStreamReader, base: String): Stream[Arc] = {
+    val e = XML.load(content)
+    // TODO: use a callback rather than Stream[Arc]
+    XMLtoRDFlogic.getArcs(e, base)
+  }
 
-  /**
-   * @throws IOException if openConnection(addr) throws one
-   */
-  def loadNT(web: URLOpener, addr: String): Stream[Arc] = {
+  def loadRDFa(content: InputStreamReader, base: String): Stream[Arc] = {
+    val e = XML.load(content)
+    val baseh = e \ "head" \ "base" \ "@href"
+    RDFaParser.getArcs(e, if (base.isEmpty) base else baseh.text)
+  }
+
+  def loadNT(content: InputStreamReader, base: String): Stream[Arc] = {
     val p = new NTriplesParser()
-    p.arcs(p.parseAll(p.ntripleDoc, web.open_any(addr)))
+    p.arcs(p.parseAll(p.ntripleDoc, content))
   }
 
   /**
    * @throws IOException if openConnection(addr) throws one
    */
-  def loadTurtle(web: URLOpener, addr: String, base: String): Stream[Arc] = {
+  def loadTurtle(content: InputStreamReader, base: String): Stream[Arc] = {
     val p = new TurtleParser(base)
-    p.arcs(p.parseAll(p.turtleDoc, web.open(addr, TURTLE)._1))
+    p.arcs(p.parseAll(p.turtleDoc, content))
   }
-  def loadTurtle(addr: String): Stream[Arc] = loadTurtle(web0, addr, addr)
 
-  def loadSPARQL(web: URLOpener, addr: String, base: String): Stream[Arc] = {
+  def loadSPARQL(content: InputStreamReader, base: String): Stream[Arc] = {
     val p = new SPARQLParser(base)
 
-    p.arcs(p.parseAll(p.AskQuery, web.open(addr, SPARQL)._1))
-  }
-  def loadSPARQL(addr: String): Stream[Arc] = loadSPARQL(web0, addr, addr)
-    
-  /**
-   * Absolutize a URI reference w.r.t. cwd.
-   */
-  def cwdbased(ref: String): String = {
-    val cwd = java.lang.System.getProperty("user.dir")
-    new java.io.File(cwd).toURI().resolve(ref).toString()
+    p.arcs(p.parseAll(p.AskQuery, content))
   }
 }
 
@@ -96,7 +105,9 @@ object WebData extends TermNode {
  * a la python's URLOpener
  * hint: conn.getContentType()
  */
-class URLOpener {
+abstract class URLOpener {
+  def abs(ref: String): String
+
   def open(addr: String, accept: String): (InputStreamReader, URLConnection) = {
     val conn = new java.net.URL(addr).openConnection()
     conn.setRequestProperty("accept", accept)
@@ -105,6 +116,17 @@ class URLOpener {
   }
 
   def open_any(addr: String): InputStreamReader = open(addr, "*/*")._1
+}
+
+/**
+ * Opener whose base is user.dir (cwd)
+ */
+object CWDOpener extends URLOpener {
+  val cwd = new java.io.File(java.lang.System.getProperty("user.dir")).toURI()
+
+  def abs(ref: String): String = {
+    cwd.resolve(ref).toString()
+  }
 }
 
 object XMLtoRDFlogic extends rdfxml.XMLtoRDF with RDFXMLTerms

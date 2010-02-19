@@ -1,7 +1,7 @@
 package org.w3.swap.test
 
 import org.w3.swap
-import swap.webdata.{WebData, URLOpener}
+import swap.webdata.{WebData, URLOpener, CWDOpener}
 import swap.logic1.Term
 import swap.logic1ec.ECFormula
 import swap.rdflogic.{RDFXMLTerms, Name, Plain, XMLVar, Scope}
@@ -175,7 +175,7 @@ extends TestSuite(manifest) {
 			      testSchema.`RDF-XML-Document`) ) {
 	  WebData.loadData(web, addr, WebData.RDFXML)
 	} else if (manifest.contains(u, rdf_type, testSchema.`NT-Document`)) {
-	  WebData.loadNT(web, addr)
+	  WebData.loadData(web, addr, "text/plain")
 	} else {
 	  DEBUG("@@unknown document type:  for test document " + u)
 	  DEBUG(manifest.each(u, rdf_type, what).mkString("types:",
@@ -220,9 +220,9 @@ extends TestSuite(manifest) {
 	  else {
 	    val data = RL.graphFormula(WebData.loadData(web, inaddr,
 							WebData.RDFa_types))
-	    val pattern = RL.graphFormula(WebData.loadSPARQL(web,
-							     outaddr,
-							     outaddr))
+	    val pattern = RL.graphFormula(WebData.loadData(web,
+							   outaddr,
+							   WebData.SPARQL))
 
 	    if (pattern == null) {
 	      (test, titlestr, UnsupportedFeature("SPARQL parse failure"))
@@ -250,12 +250,12 @@ class RDFaExample(indoc: String, outdoc: String) {
   import swap.webdata.RDFQ
 
   def run(): Stream[(Term, String, TestResult)] = {
-    val web = new URLOpener()
-    val base = WebData.cwdbased(indoc)
+    val web = CWDOpener
+    val base = web.abs(indoc)
     val actual = RL.graphFormula(WebData.loadData(web, base,
 						  WebData.RDFa_types))
     val expected = RL.graphFormula(
-      WebData.loadTurtle(web, WebData.cwdbased(outdoc), base))
+      WebData.loadTurtle(web.open_any(web.abs(outdoc)), base))
     val aTest = swap.rdflogic.XMLVar("test", Some(this.hashCode()))
 
     val result = RL.entails(actual, expected) && RL.entails(expected, actual)
@@ -272,8 +272,8 @@ class RDFaExample(indoc: String, outdoc: String) {
 
 object Runner {
   def main(args: Array[String]): Unit = {
-    lazy val mirror = new MirrorOpener(WebData.cwdbased(args(1)),
-				       WebData.cwdbased(args(2)))
+    lazy val mirror = new MirrorOpener(CWDOpener.abs(args(1)),
+				       CWDOpener.abs(args(2)))
     lazy val manifest = new Graph(WebData.loadData(mirror, args(1),
 						   WebData.RDFXML))
 
@@ -349,6 +349,7 @@ extends URLOpener{
     (reader, conn)
   }
 
+  override def abs(ref: String) = gu.resolve(ref).toString
 }
 
 object DEBUG{
