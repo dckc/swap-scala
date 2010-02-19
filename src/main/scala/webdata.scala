@@ -22,6 +22,7 @@ import SExp.fromSeq
 object WebData extends TermNode {
   val web0 = new URLOpener()
 
+  final val APP_XML = "application/xml"
   final val RDFXML = "application/rdf+xml"
   final val HTML = "text/html"
   final val TURTLE = "text/turtle"
@@ -38,7 +39,7 @@ object WebData extends TermNode {
     NoParams.findFirstIn(conn.getContentType) match {
       case None => throw new Exception("@@goofy media type syntax")
       case Some(ct) => ct.toLowerCase match {
-	case RDFXML =>
+	case RDFXML | APP_XML =>
 	  val e = XML.load(reader)
           // TODO: use a callback rather than Stream[Arc]
           XMLtoRDFlogic.getArcs(e, base)
@@ -103,10 +104,7 @@ class URLOpener {
     (reader, conn)
   }
 
-  def open_any(addr: String): InputStreamReader = {
-    val conn = new java.net.URL(addr).openConnection()
-    new InputStreamReader(conn.getInputStream())
-  }
+  def open_any(addr: String): InputStreamReader = open(addr, "*/*")._1
 }
 
 object XMLtoRDFlogic extends rdfxml.XMLtoRDF with RDFXMLTerms

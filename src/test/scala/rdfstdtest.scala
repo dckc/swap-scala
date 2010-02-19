@@ -4,13 +4,19 @@ import org.w3.swap
 import swap.webdata.{WebData, URLOpener}
 import swap.logic1.Term
 import swap.logic1ec.ECFormula
-import swap.rdflogic.{RDFXMLTerms, Name, Plain}
+import swap.rdflogic.{RDFXMLTerms, Name, Plain, XMLVar, Scope}
 import swap.webdata.Graph
+import swap.rdfxml
+import swap.rdfxml.{SimpleSerializer => RDFout}
 
 abstract class Namespace(n: String) {
   protected def term(name: String): Name = {
     Name(n + name)
   }
+}
+
+object RDFS extends Namespace("http://www.w3.org/2000/01/rdf-schema#") {
+  final val label = term("label")
 }
 
 /**
@@ -46,9 +52,27 @@ object testDescription extends Namespace(
   final val purpose = term("purpose")
 }
 
-object dc extends Namespace(
+object DC extends Namespace(
   "http://purl.org/dc/elements/1.1/") {
   final val title = term("title")
+  final val description = term("description")
+}
+
+object FOAF extends Namespace("http://xmlns.com/foaf/0.1/") {
+  final val homepage = term("homepage")
+}
+
+object DOAP extends Namespace("http://usefulinc.com/ns/doap#") {
+  final val name = term("name")
+}
+
+object EARL extends Namespace("http://www.w3.org/ns/earl#") {
+  final val subject = term("subject")
+  final val test = term("test")
+  final val outcome = term("outcome")
+  final val pass = term("pass")
+  final val fail = term("fail")
+  final val result = term("result")
 }
 
 sealed abstract class TestResult
@@ -67,7 +91,7 @@ extends TestSuite(manifest) {
 
   val what = manifest.qvar
   val what2 = manifest.vars.fresh("what")
-  
+
   override def run(): Stream[(Term, String, TestResult)] = {
     for {
       (test, td, o) <- manifest.arcsMatching(what, testSchema.description,
@@ -85,9 +109,11 @@ extends TestSuite(manifest) {
 	    case testSchema.NegativeEntailmentTest => {
 	      (test, desc, entailmentTest(test, false))
 	    }
+	    /* TODO: finish RDF/XML parser
 	    case testSchema.PositiveParserTest => {
 	      (test, desc, positiveParserTest(test))
 	    }
+	    */
 	    case t => {
 	      (test, desc, UnsupportedFeature("test type: " + t))
 	    }
@@ -121,13 +147,17 @@ extends TestSuite(manifest) {
 
       val conclusion = load(manifest.any(test, testSchema.conclusionDocument,
 					 what))
-      println()
-      println(test)
-      println("premise: " + premise)
-      println("entails?" + expected)
-      println("conclusion: " + conclusion)
+      val actual = RL.entails(premise, conclusion)
 
-      RunResult(RL.entails(premise, conclusion) == expected)
+      if (actual != expected) {
+	DEBUG("")
+	DEBUG(test)
+	DEBUG("premise: " + premise)
+	DEBUG("entails?" + expected)
+	DEBUG("conclusion: " + conclusion)
+      }
+
+      RunResult(actual == expected)
     }
   }
 
@@ -147,15 +177,15 @@ extends TestSuite(manifest) {
 	} else if (manifest.contains(u, rdf_type, testSchema.`NT-Document`)) {
 	  WebData.loadNT(web, addr)
 	} else {
-	  println("@@unknown document type:  for test document " + u)
-	  println(manifest.each(u, rdf_type, what).mkString("types:",
+	  DEBUG("@@unknown document type:  for test document " + u)
+	  DEBUG(manifest.each(u, rdf_type, what).mkString("types:",
 							      "\n ", "\n"))
 	  Stream.empty
 	}
       }
       case _ => {
-	println("@@document term not a URI: " + u)
-	println("@@TODO FalseDocument support.")
+	DEBUG("@@document term not a URI: " + u)
+	DEBUG("@@TODO FalseDocument support.")
 	Stream.empty
       }
     }
@@ -174,7 +204,7 @@ extends TestSuite(manifest) {
   override def run(): Stream[(Term, String, TestResult)] = {
     for {
       test <- manifest.each(what, rdf_type, testDescription.TestCase)
-      title = manifest.any(test, dc.title, what)
+      title = manifest.any(test, DC.title, what)
       indoc = manifest.any(test,
 			   testDescription.informationResourceInput,
 			   what)
@@ -200,11 +230,11 @@ extends TestSuite(manifest) {
 	      // TODO: handle expectedResults false
 	      val result = RL.entails(data, pattern)
 	      if (!result) {
-		println()
-		println("expected (from SPARQL):")
-		println(RDFQ.quote(pattern).pretty())
-		println("actual:")
-		println(RDFQ.quote(data).pretty())
+		DEBUG()
+		DEBUG("expected (from SPARQL):")
+		DEBUG(RDFQ.quote(pattern).pretty())
+		DEBUG("actual:")
+		DEBUG(RDFQ.quote(data).pretty())
 	      }
 	      (test, titlestr, RunResult(result))
 	    }
@@ -231,8 +261,8 @@ class RDFaExample(indoc: String, outdoc: String) {
     val result = RL.entails(actual, expected) && RL.entails(expected, actual)
 
     if(!result) {
-      println("expected: " + RDFQ.quote(expected).pretty())
-      println("actual: " + RDFQ.quote(actual).pretty())
+      DEBUG("expected: " + RDFQ.quote(expected).pretty())
+      DEBUG("actual: " + RDFQ.quote(actual).pretty())
     }
 
     Stream.cons((aTest, indoc, RunResult(result)),
@@ -252,18 +282,47 @@ object Runner {
       case "--rdfa" => new RDFaTestSuite(manifest, mirror).run()
       case "--rdfax" => new RDFaExample(args(1), args(2)).run()
       case _ => {
-	println("Usage: rdfstdtest --entailment|--rdfa manifest mirror")
+	System.err.println(
+	  "Usage: rdfstdtest --entailment|--rdfa manifest mirror")
 	Stream.empty
       }
     }
 
-    for ((test, desc, result) <- results) {
-      println()
-      println("" + result + desc)
-      println("" + test)
-      println()
-      println ("=== ")
+    val stdout = new java.io.OutputStreamWriter(java.lang.System.out)
+
+    import swap.rdflogic.{RDFLogic => RL }
+    val fresh = new Scope(Nil).fresh _
+    val sw = fresh("sw")
+    val swdesc = Stream[RDFout.Arc](
+      (sw, DOAP.name, Plain("swap-scala", None)),
+      (sw, FOAF.homepage, Name("http://code.google.com/p/swap-scala/"))
+    )
+    val testarcs = results.toStream.flatMap { case (test, desc, result) =>
+      val assertion = fresh("assertion")
+      val earlresult = fresh("result")
+      val resultdesc = result match {
+	case RunResult(true) => Stream((earlresult, EARL.outcome, EARL.pass))
+	case RunResult(false) => Stream((earlresult, EARL.outcome, EARL.fail))
+	case BadTestData(msg) => {
+	  val outcome = fresh("badt")
+	  Stream((earlresult, EARL.outcome, outcome),
+		 (outcome, RDFS.label, Plain(msg, None)))
+	}
+	case UnsupportedFeature(msg) => {
+	  val outcome = fresh("unsup")
+	  Stream((earlresult, EARL.outcome, outcome),
+		 (outcome, RDFS.label, Plain(msg, None)))
+	}
+      }
+      resultdesc ++ Stream(
+	(test, DC.description, Plain(desc, None)),
+	(assertion, EARL.subject, sw),
+	(assertion, EARL.test, test),
+	(assertion, EARL.result, earlresult) )
     }
+
+    RDFout.writeArcsDoc(stdout, swdesc ++ testarcs)
+    stdout.close()
   }
 }
 
@@ -274,17 +333,24 @@ object Runner {
  */
 class MirrorOpener(val global: String, val local: String)
 extends URLOpener{
-  import java.net.{URI, URL}
+  import java.net.{URI, URL, URLConnection}
   import java.io.InputStreamReader
 
   protected val gu = new URI(global).resolve("./")
   protected val lu = new URI(local).resolve("./")
 
-  def open(addr: String): InputStreamReader = {
+  override def open(addr: String,
+		    accept: String): (InputStreamReader, URLConnection) = {
     val actual = lu.resolve(gu.relativize(new URI(addr)))
 
     val conn = actual.toURL.openConnection()
-    new InputStreamReader(conn.getInputStream())
+    conn.setRequestProperty("accept", accept)
+    val reader = new InputStreamReader(conn.getInputStream())
+    (reader, conn)
   }
 
+}
+
+object DEBUG{
+  def apply(s: Any) = System.err.println(s.toString)
 }
