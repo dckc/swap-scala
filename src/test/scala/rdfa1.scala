@@ -5,10 +5,20 @@ import org.scalatest.matchers.ShouldMatchers
 
 import org.w3.swap
 import swap.webdata.RDFaParser
-import swap.rdflogic.{Name, XMLVar}
+import swap.rdflogic.{Name, XMLVar, Scope}
 
 class RDFaMisc extends Spec with ShouldMatchers {
 
+  describe("XML variable scope") {
+    val s = new Scope(Nil)
+    it("should make distinct fresh vars") {
+      (s.fresh("x").qual == s.fresh("x").qual) should equal (false)
+    }
+
+    it("should find vars by name") {
+      (s.byName("x") == s.byName("x")) should equal (true)
+    }
+  }
   describe("RDFa walker") {
 
     it("should stop chaining on bogus rel values (Test #105) ") {

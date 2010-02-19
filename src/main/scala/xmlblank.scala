@@ -42,7 +42,7 @@ class Scope(val vars: Iterable[Variable]) {
    */
   def byName(name: String): XMLVar = {
     var safe = safeName(name)
-    varstack.find { v => v.quote().toString() == safe } match {
+    varstack.find { v => v.sym.name == safe } match {
       case None => fresh(safe)
       case Some(v) => v
     }
@@ -58,7 +58,7 @@ class Scope(val vars: Iterable[Variable]) {
     val baseName = safeName(suggestedName)
 
     val b = {
-      val seen = varstack.exists { v => v.quote().toString() == baseName }
+      val seen = varstack.exists { v => v.sym.name == baseName }
       if (seen) XMLVar(baseName, Some(varstack.size))
       else XMLVar(baseName, None)
     }
