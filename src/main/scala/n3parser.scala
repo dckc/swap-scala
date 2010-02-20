@@ -6,21 +6,42 @@ import scala.collection.immutable.ListSet
 
 import org.w3.swap
 import swap.uri.Util.combine
-import swap.logic1ec.And
-import swap.rdf.RDFNodeBuilder
-import swap.turtle.TurtleLex
+import swap.rdf.{RDFGraphParts}
+import swap.turtle.{TurtleLex, CheckedParser}
 
-class N3Lex extends swap.turtle.TurtleLex {
-
-  def uvar: Parser[String] = ("\\?" + localname_re).r ^^ {
-    case str => str.substring(1)
-  }
-
-  def evar = nodeID
+trait N3LogicTerms extends RDFGraphParts {
+  type Term = Node
+  type V <: Term
+  type BlankNode = V
+  type SubjectNode = Term
 }
 
+trait N3TermBuilder extends N3LogicTerms {
+
+  lazy val log_implies = uri("http://www.w3.org/2000/10/swap/log#implies")
+  lazy val rdf_type = uri(swap.rdf.Vocabulary.`type`)
+
+  def uri(i: String): Label
+  def typed(lex: String, dt: String): Term
+  def plain(lex: String, lang: Option[Symbol]): Term
+
+  def fresh(hint: String, universal: Boolean): V
+  def byName(name: Label, universal: Boolean): V
+
+  def constant(value: Boolean): Literal
+  def constant(value: Int): Literal
+  def constant(value: Double): Literal
+  def constant(value: BigDecimal): Literal
+
+  def pushScope()
+  def addStatement(s: Term, p: Term, o: Term)
+  def mkList(items: List[Term]): Term
+  def popScope(): Term
+}
+
+
 /**
- * N3Parser builds a Formula from Notation3 text.
+ * N3Syntax is an abstract parser for Notation3 text.
  *
  * This is a fairly straightforward transcription of
  * <a href="http://www.w3.org/2000/10/swap/grammar/notation3.bnf"
@@ -54,60 +75,33 @@ class N3Lex extends swap.turtle.TurtleLex {
  *                see also combine
  * 
  * @author <a href="http://www.w3.org/People/Connolly/">Dan Connolly</a>
-
-class N3Parser(override val baseURI: String) extends N3Syntax(baseURI) {
-  import swap.rdflogic.RDFLogic
-
-  def mkatom(s: Node, p: Node@@@, o: Term): Formula = {
-    RDFLogic.atom(s, p, o)
-  }
-}
-  */
-
-abstract class N3Syntax(val baseURI: String) extends N3Lex with RDFNodeBuilder {
-
-  def fresh(hint: String): BlankNode
-  def byName(name: String): BlankNode
-  def constant(value: Boolean): Literal
-  def constant(value: Int): Literal
-  def constant(value: Double): Literal
-  def constant(value: BigDecimal): Literal
-
-  def pushScope(): Unit
-  def popScope(): Unit
-  def addAtom(s: Node, p: Node, o: Node): Unit
+ */
+abstract class N3Syntax(val baseURI: String) extends N3Lex
+with N3TermBuilder with CheckedParser {
 
 
   val namespaces = scala.collection.mutable.HashMap[String, String]()
+  var keywords: Option[Set[Symbol]] = None
 
   def document: Parser[Unit] = rep(statement <~ ".") ^^ { case _ => () }
 
-  /* ***untested
   def formulacontent: Parser[Unit] = repsep(statement, ".") <~ opt(".") ^^ {
-    case sts => {
-      val out = mkFormula(List[Formula]() + scopes.top.statements)
-      scopes.pop()
-      out
-    }
+    case sts => ()
   }
-  */
 
   def statement = ( declaration
-		   /**** test later
-		   * universal
-		   * existential
-		   */
-		   | simplestatement )
+		   | universal
+		   | existential
+		   | simplestatement
+		 )
 
-    /**** test later
-  val universal = "@forAll" >~ repsep(symbol, ",") <~ "." ^^ {
-    case symbols => scopes.top.avars += symbols
+  def universal = "@forAll" ~> repsep(symbol, ",") <~ "." ^^ {
+    case symbols => symbols.foreach(byName(_, true))
   }
 
-  val universal = "@forAll" >~ repsep(symbol, ",") <~ "." ^^ {
-    case symbols => scopes.top.evars += symbols
+  val existential = "@forSome" ~> repsep(symbol, ",") <~ "." ^^ {
+    case symbols => symbols.foreach(byName(_, false))
   }
-  *** */
 
   def declaration: Parser[Unit] = prefixDecl | keywordsDecl
 
@@ -117,17 +111,16 @@ abstract class N3Syntax(val baseURI: String) extends N3Lex with RDFNodeBuilder {
     }
   }
 
-  def keywordsDecl: Parser[Unit] = "@keywords" ~> repsep(qname, ",") ^^ {
-    /** TODO: implement keywords decl. kinda yucky */
-    case qnames => None
+  def keywordsDecl: Parser[Unit] = "@keywords" ~> repsep(barename, ",") ^^ {
+    case words => keywords = Some(words.map(Symbol(_)).toSet)
   }
 
-  def mkprops(t1: Node, props: List[(Node, Node, Boolean)]) = {
+  def mkprops(t1: Term, props: List[(Term, Term, Boolean)]) = {
     for(prop <- props) {
       prop match {
       // inverted?
-        case (t2, t3, false) => addAtom(t1, t2, t3)
-        case (t2, t3, true) => addAtom(t3, t2, t1)
+        case (t2, t3, false) => addStatement(t1, t2, t3)
+        case (t2, t3, true) => addStatement(t3, t2, t1)
       }
     }
   }
@@ -136,78 +129,76 @@ abstract class N3Syntax(val baseURI: String) extends N3Lex with RDFNodeBuilder {
     case t1 ~ propertylist => mkprops(t1, propertylist)
   }
 
-  def propertylist: Parser[List[(Node, Node, Boolean)]] =
+  def propertylist: Parser[List[(Term, Term, Boolean)]] =
     repsep(property, ";") ^^ {
       case properties => properties.flatMap(x => x)
     }
     
 
-  def property: Parser[List[(Node, Node, Boolean)]] = (
+  def k(sym: Symbol): Parser[Symbol] = (
+    ("@" + localname_re).r ^^ { case kw => Symbol(kw.substring(1)) }
+    | checked(sym.name ^^ { case s => sym }) {
+      case (s, in) => (
+	if (keywords.getOrElse(Set.empty) contains sym) Success(sym, in)
+	else Failure("barename not keyword", in)
+	)
+    }
+  )
+
+  def property: Parser[List[(Term, Term, Boolean)]] = (
     // TODO: with keywords, this becomes @has
-    opt("has") ~> term ~ repsep(term, ",") ^^ {
+    opt(k('has)) ~> term ~ repsep(term, ",") ^^ {
       case t2 ~ tn => tn.map(ti => (t2, ti, false))
     }
 
-    | "is" ~> term ~ "of" ~ repsep(term, ",") ^^ {
+    | k('is) ~> term ~ k('of) ~ repsep(term, ",") ^^ {
       case t2 ~ x ~ tn => tn.map(ti => (t2, ti, true))
     }
   )
 
     // TODO: paths
-  def term: Parser[Node] = (
+  def term: Parser[Term] = (
     symbol
     | literal
     | "[" ~> propertylist <~ "]" ^^ {
       case props => {
-	val v = fresh("something")
+	val v = fresh("something", false)
 	mkprops(v, props)
 	v
       }
     }
-/* ******
-    | evar ^^ { case name =>
-      BlankNode(name, Some((scopes.top.line, scopes.top.column))) }
-    | uvar ^^ { case name => EVar(Symbol(name)) } // TODO: uvar scope
-    | "{" ~> formulacontent <~ "}" ^^ {
-      case fmlas => Literal("{...@@...}") // TODO: {} scopes/ terms
+    | evar ^^ { case name => byName(uri(combine(baseURI, name)), false) }
+    | uvar ^^ { case name => byName(uri(combine(baseURI, name)), true) }
+    | ("{" ^^ { case open => pushScope() }) ~> formulacontent <~ "}" ^^ {
+      case fmlas => popScope()
     }
     | "(" ~> rep(term) <~ ")" ^^ {
-      case items => Apply('list, items) // TODO: first/rest for lists?
+      case items => mkList(items)
     }
-*/
   )
-
-    /* checked wraps a Parser[T] with a check on its results
-     * */
-  protected def checked[T](p: => Parser[T])(
-    check: (T, Input) => ParseResult[T]): Parser[T] = Parser {
-      in => p(in) match {
-	case s @ Success(x, in) => check(x, in)
-	case ns => ns
-      }
-    }
 
     /* TODO: test whether  'a' allowed in the object spot in n3/turtle.
      * How about as a datatype? */
   def symbol: Parser[Label] = (
     uriref ^^ { case ref => uri(combine(baseURI, ref)) }
 
+    | "a" ^^ { case s => rdf_type }
+    | "=" ^^ { case s => uri("http://www.w3.org/2002/07/owl#sameAs") }
+    | "=>" ^^ {
+      case s => log_implies }
+
     | checked(qname) { case (q, in) => (
       if (namespaces.isDefinedAt(q._1)) Success(q, in)
       else Error("no such prefix: " + q._1, in)
     ) } ^^ { case (p, l) => uri(namespaces(p) + l) }
 
-    | "a" ^^ { case s => rdf_type }
-    | "=" ^^ { case s => uri("http://www.w3.org/2002/07/owl#sameAs") }
-    /* 
-     | "=>" ^^ {
-     case s => URI("http://www.w3.org/2000/10/swap/log#implies") }
-     */
+    | checked(localname_re.r) { case (n, in) => (
+      if (!keywords.isEmpty) Success(n, in)
+      else Failure("not a symbol: " + n, in)
+    ) } ^^ { case n => uri(combine(baseURI, n)) }
   )
 
-  def literal: Parser[Node] = (
-    // TODO: can langString and datatypeString use """s too?
-    // TODO: left factor string-handling.
+  def literal: Parser[Term] = (
     datatypeString ^^ { case (lex, dt) => typed(lex, dt) }
     | quotedStringAtLanguage  ^^ {
       case (s, lang) => plain(s, lang) }
@@ -234,3 +225,13 @@ abstract class N3Syntax(val baseURI: String) extends N3Lex with RDFNodeBuilder {
   )
 }
 
+class N3Lex extends swap.turtle.TurtleLex {
+
+  def barename: Parser[String] = localname_re.r
+
+  def uvar: Parser[String] = ("\\?" + localname_re).r ^^ {
+    case str => str.substring(1)
+  }
+
+  def evar = nodeID
+}

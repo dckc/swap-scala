@@ -14,7 +14,7 @@ import swap.rdf.Vocabulary
  * http://www.w3.org/TeamSubmission/turtle/#sec-grammar-grammar
  */ 
 abstract class TurtleSyntax(val initialBase: String)
-extends TurtleLex with RDFNodeBuilder {
+extends TurtleLex with RDFNodeBuilder with CheckedParser {
   def fresh(hint: String): BlankNode
   def byName(name: String): BlankNode
 
@@ -156,17 +156,19 @@ extends TurtleLex with RDFNodeBuilder {
 
   )
 
+}
+
+trait CheckedParser extends Parsers {
   /**
    * checked wraps a Parser[T] with a check on its results
    */
-  protected def checked[T](p: => Parser[T])(
+  def checked[T](p: => Parser[T])(
     check: (T, Input) => ParseResult[T]): Parser[T] = Parser {
       in => p(in) match {
 	case s @ Success(x, in) => check(x, in)
 	case ns => ns
       }
     }
-
 }
 
 
