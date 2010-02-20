@@ -31,22 +31,64 @@ class TestN3Logic(t: List[Implication]) extends TestLogic(t) {
 }
 
 class N3ParseMisc extends Spec with ShouldMatchers {
+  val l = new TestN3Logic(Nil)
+
+  def parsedoc(p: N3Parser, doc: String): String = {
+    val fmlas = p.parseAll(p.document, doc) match {
+      case p.Success(_, _) => p.theory
+      case lose => {
+	System.err.println("N3Parser failed:")
+	System.err.println(lose.toString)
+	Nil
+      }
+    }
+
+    fmlas.map(l.quote(_).pretty()).mkString("\n")
+  }
+
   describe("N3 Parser") {
-    val n3p = new N3Parser("data:")
 
     it("should do the 'pat knows joe' case.") {
-      val fmlas = n3p.parseAll(n3p.document,
-			       "<#pat> <#knows> <#joe>.") match {
-	case n3p.Success(_, _) => n3p.theory
-	case lose => {
-	  System.err.println("N3Parser failed:")
-	  System.err.println(lose.toString)
-	  Nil
-	}
-      }
-      val l = new TestN3Logic(fmlas)
-      fmlas.map(l.quote(_).pretty()).mkString("\n") should equal (
-	"""(related (data:#pat ) (data:#knows ) (data:#joe ) )"""
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, "<#pat> <#knows> <#joe>.") should equal (
+	"""(holds (data:#pat ) (data:#knows ) (data:#joe ) )"""
+      )
+    }
+
+    /* TODO: reset variable scope at end of fmla
+    it("should keep adding formulas.") {
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, "<#pat> <#knows> _:somebody.")
+
+      parsedoc(n3p, "<#joe> <#knows> _:somebody.") should equal (
+	"""(related (data:#pat ) (data:#knows ) (data:#joe ) )@@"""
+      )
+    }
+    */
+    it("should handle implication.") {
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, "{ <#x> <#p> <#y> } => { <#x> <#p> [] } .") should equal (
+	"""(implies
+  (holds (data:#x ) (data:#p ) (data:#y ) )
+  (holds (data:#x ) (data:#p ) "_:tag:public-cwm-talk@w3.org,e0" )
+  )"""
+      )
+    }
+
+    it("should handle multiple atoms in an implication.") {
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, """
+{ <#x> <#p> <#y>.
+  <#bob> <#knows> <#joe>.
+ } => { <#x> <#p> [] } .
+""") should equal (
+	"""(implies
+  (and
+    (holds (data:#bob ) (data:#knows ) (data:#joe ) )
+    (holds (data:#x ) (data:#p ) (data:#y ) )
+    )
+  (holds (data:#x ) (data:#p ) "_:tag:public-cwm-talk@w3.org,e0" )
+  )"""
       )
     }
   }

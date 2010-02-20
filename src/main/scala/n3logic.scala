@@ -94,7 +94,7 @@ trait N3TheoryBuilder extends N3TermBuilder  {
     val fmla = if (p == log_implies) {
       Implication(t2and(s), t2and(o))
     } else {
-      Atomic('related, List(s, p, o))
+      Atomic('holds, List(s, p, o))
     }
     scopes.top.theory.push(fmla)
   }
@@ -108,8 +108,8 @@ trait N3TheoryBuilder extends N3TermBuilder  {
       // TODO: Exists??!?!
       case Exists(xi, c) => App('exists, List(App('OOPS, xi.toList), reify(c)))
       case And(ai) => App('AND, ai.map(reify _))
+      case Atomic('holds, List(s, p, o)) => App('related, List(s, p, o))
       case Atomic('notnil, List(a)) => a
-      case Atomic('related, List(s, p, o)) => App('related, List(s, p, o))
       case Atomic(rel, args) => App('TODO_OOPS, List(App(rel, args)))
     }
   }
@@ -117,13 +117,14 @@ trait N3TheoryBuilder extends N3TermBuilder  {
   protected def t2and(t: Term): Conjunction = {
     t match {
       case App('AND, args) => Conjunction(args.map(t2atom _))
+      case App('related, List(s, p, o)) => Atomic('holds, List(s, p, o))
       case t => Atomic('notnil, List(t))
     }
   }
 
   protected def t2atom(t: Term): Atomic = {
     t match {
-      case App('related, List(s, p, o)) => Atomic('related, List(s, p, o))
+      case App('related, List(s, p, o)) => Atomic('holds, List(s, p, o))
       case t => Atomic('notnil, List(t))
     }
   }

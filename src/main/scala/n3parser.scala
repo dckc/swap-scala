@@ -183,9 +183,9 @@ with N3TermBuilder with CheckedParser {
     uriref ^^ { case ref => uri(combine(baseURI, ref)) }
 
     | "a" ^^ { case s => rdf_type }
-    | "=" ^^ { case s => uri("http://www.w3.org/2002/07/owl#sameAs") }
     | "=>" ^^ {
       case s => log_implies }
+    | "=" ^^ { case s => uri("http://www.w3.org/2002/07/owl#sameAs") }
 
     | checked(qname) { case (q, in) => (
       if (namespaces.isDefinedAt(q._1)) Success(q, in)
