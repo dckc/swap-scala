@@ -56,7 +56,7 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
   def derive1(c: Conjunction, pfs: List[Appeal]): Option[Appeal] = {
     assert(wff(c))
-    val state = pfs.map { case Appeal(_, a: Atomic, _, _) => a }
+    val state = pfs.partialMap { case Appeal(_, a: Atomic, _, _) => a }
     assert(state.forall(wff _))
 
     val goalqty = c.ai.length
@@ -69,7 +69,7 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
   def derive1(d: Disjunction, pfs: List[Appeal]): Option[Appeal] = {
     assert(wff(d))
-    val state = pfs.map { case Appeal(_, a: Atomic, _, _) => a }
+    val state = pfs.partialMap { case Appeal(_, a: Atomic, _, _) => a }
     assert(state.forall(wff _))
 
     val answers = for {
@@ -137,10 +137,10 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
     assert(state.forall { a => wff(a.conclusion) } )
     assert(wff(d))
 
-    println("@@consequence conjecture: " + d)
+    //println("consequence conjecture: " + d)
 
     def checkstate(state: List[Appeal]): Option[Appeal] = {
-      println("@@checkstate facts: " + state)
+      //println("checkstate facts: " + state)
 
       val base = derive1(d, state)
       if (!base.isEmpty) base
@@ -185,7 +185,8 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
   def nontrivial_conclusions(pfs: List[Appeal]): Stream[(Disjunction,
 							 Appeal)] = {
-    val x = pfs.map { case Appeal(_, a: Atomic, _, _) => a }
+    // TODO: think about types to avoid this partialMap
+    val x = pfs.partialMap { case Appeal(_, a: Atomic, _, _) => a }
 
     for {
       ax <- theory.toStream
