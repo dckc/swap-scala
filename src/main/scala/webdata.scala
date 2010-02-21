@@ -78,7 +78,7 @@ object WebData extends TermNode {
   def loadRDFa(content: InputStreamReader, base: String): Stream[Arc] = {
     val e = XML.load(content)
     val baseh = e \ "head" \ "base" \ "@href"
-    RDFaParser.getArcs(e, if (base.isEmpty) base else baseh.text)
+    RDFaParser.getArcs(e, if (baseh.isEmpty) base else baseh.text)
   }
 
   def loadNT(content: InputStreamReader, base: String): Stream[Arc] = {
