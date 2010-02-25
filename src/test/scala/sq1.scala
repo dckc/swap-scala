@@ -22,7 +22,7 @@ class SparqlFragment extends Spec with ShouldMatchers {
 
       p.parseAll(p.AskQuery, q0001) match {
 	case p.Success(f, _) => {
-	  println("parsed " + q0001 + " to " + f)
+	  // println("parsed " + q0001 + " to " + f)
 	  true
 	}
 
