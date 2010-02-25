@@ -22,9 +22,11 @@ import SExp.fromSeq
 object WebData extends TermNode {
   val web0 = CWDOpener
 
+  // TODO: consider capturing more content type semantics in scala
   final val APP_XML = "application/xml"
   final val RDFXML = "application/rdf+xml"
   final val HTML = "text/html"
+  final val N3 = "text/n3"
   final val TURTLE = "text/turtle"
   final val SPARQL = "application/sparql-query"
   final val XHTML = "application/xhtml+xml"
@@ -116,6 +118,17 @@ abstract class URLOpener {
   }
 
   def open_any(addr: String): InputStreamReader = open(addr, "*/*")._1
+}
+
+/**
+ * Opener with given base
+ */
+class BaseOpener(base: String) extends URLOpener {
+  protected val baseURI = new java.net.URI(base)
+
+  def abs(ref: String): String = {
+    baseURI.resolve(ref).toString()
+  }
 }
 
 /**

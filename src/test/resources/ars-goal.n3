@@ -1,0 +1,10 @@
+# from section 4 A Small Case Study
+# of "Automating Coherent Logic"
+
+@prefix a: <ars-coherent#>.
+@prefix : <ars-instantiate#>.
+@keywords is, of, a.
+
+@forAll x, y, z.
+
+{ x a:re y. x a:re z. } => { @forSome u. y a:re u. z a:re u. }.

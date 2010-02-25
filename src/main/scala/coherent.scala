@@ -19,11 +19,114 @@ import swap.logic1ec.{AtomicParts, ConjunctiveQuery}
  * TODO: split out proof generation part
  */
 
-abstract class CoherentLogic(theory: List[Implication])
-extends FormalSystem with ConjunctiveQuery[Atomic]{
+class CoherentLogic extends FormalSystem {
   type Formula = Implication
 
-  def axiom(f: Formula) = theory contains f
+  override def axiom(f: Formula) = false
+
+  override def wff(f: Formula) = true
+
+  // TODO
+  def appeal_step_ok(x: Appeal, thms: List[Formula]): Boolean = false
+  override val methods = List[Symbol]()
+
+  override def rule(method: Symbol): Rule = {     // TODO
+    case (premises, conclusion) => false
+  }
+}
+
+/**
+ * Definition 1: Coherent formula, disjunction, conjunction, implication.
+ * TODO: allow Atomic where Conjunction goes, etc.
+ */
+
+object Implication {
+  def apply(p: Conjunction, q: Disjunction): Implication = {
+    if (p.ai.isEmpty) q
+    else Implies(p, q)
+  }
+}
+
+sealed abstract class Implication {
+  def p: Conjunction
+  def q: Disjunction
+}
+case class Implies(val c: Conjunction,
+		   val d: Disjunction) extends Implication {
+  // use q rather than And() -> q
+  require (!p.ai.isEmpty)
+
+  // odd... doing this to avoid loop/stack overflow
+  def p = c
+  def q = d
+}
+
+object Disjunction {
+  def apply(ei: List[Existential]): Disjunction = {
+    if (ei.length == 1) ei(0)
+    else Or(ei)
+  }
+}
+
+sealed abstract class Disjunction extends Implication {
+  override def p: Conjunction = And(Nil)
+  override def q = this
+  def ei: List[Existential]
+}
+case class Or(val fmlas: List[Existential]) extends Disjunction {
+  // use f rather than Or(f)
+  require (ei.length != 1)
+  def ei = fmlas
+}
+
+object Existential {
+  import CoherentLogic.freevars
+
+  def apply(xi: Set[Variable], c: Conjunction): Existential = {
+    if ((xi intersect freevars(c)).isEmpty) c
+    else Exists(xi, c)
+  }
+}
+
+sealed abstract class Existential extends Disjunction {
+  override def ei = List(this)
+  def xi: Set[Variable]
+  def c: Conjunction
+}
+case class Exists(val xi0: Set[Variable],
+		  val c0: Conjunction) extends Existential {
+  // use f rather than Exists(empty, f)
+  require (!xi.isEmpty)
+  def xi = xi0
+  def c = c0
+}
+
+object Conjunction {
+  def apply(ai: List[Atomic]): Conjunction = {
+    if (ai.length == 1) ai(0)
+    else And(ai)
+  }
+}
+abstract class Conjunction extends Existential {
+  override def p = this
+  override def q = And(Nil)
+  override def xi: Set[Variable] = Set.empty
+  override def c = this
+  def ai: List[Atomic]
+}
+case class And(val ai0: List[Atomic]) extends Conjunction{
+  // use f rather than And(f)
+  require (ai.length != 1)
+  override def ai = ai0
+}
+
+case class Atomic(rel: Symbol, args: List[Term]) extends Conjunction
+   with AtomicParts{
+  override def ai = List(this)
+}
+
+object CoherentLogic {
+  type Formula = Implication
 
   /**
    * Does the conclusion consist of a single Atom?
@@ -31,14 +134,6 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
   def horn(f: Formula): Boolean = f.q.ei match {
     case List(e1) => e1.xi.isEmpty && e1.c.ai.length == 1
     case _ => false
-  }
-
-  def wff(f: Formula) = {
-    f match {
-      case c: Conjunction => freevars(f).isEmpty
-      case d: Disjunction => freevars(f).isEmpty
-      case _ => true
-    }
   }
 
   def freevars(f: Formula): Set[Variable] = {
@@ -54,6 +149,29 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
   val bottom = Or(Nil)
 
+  def substa(a: Atomic, s: Subst) = Atomic(a.rel, a.args.map(_.subst(s)))
+
+  def subst(c: Conjunction, s: Subst): Conjunction = {
+    Conjunction(c.ai.map(substa(_, s)))
+  }
+
+  def subst(d: Disjunction, s: Subst): Disjunction = {
+    Disjunction(d.ei.map {
+      case Atomic(rel, terms) => Atomic(rel, terms.map(_.subst(s)))
+      case And(ai) => And(ai.map(substa(_, s)))
+      case e => Exists(e.xi, subst(e.c, s))
+    })
+  }
+
+}
+
+
+abstract class CoherentProver(theory: List[Implication])
+extends CoherentLogic with ConjunctiveQuery[Atomic]{
+  import CoherentLogic.{subst, substa, freevars}
+
+  override def axiom(f: Formula) = theory contains f
+
   def derive1(c: Conjunction, pfs: List[Appeal]): Option[Appeal] = {
     assert(wff(c))
     val state = pfs.partialMap { case Appeal(_, a: Atomic, _, _) => a }
@@ -68,7 +186,7 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
   }
 
   def derive1(d: Disjunction, pfs: List[Appeal]): Option[Appeal] = {
-    assert(wff(d))
+    assert(wff(d), "goal not wff: " + d)
     val state = pfs.partialMap { case Appeal(_, a: Atomic, _, _) => a }
     assert(state.forall(wff _))
 
@@ -93,20 +211,6 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
 
   def fresh(pattern: Variable): Variable
   def parameter(pattern: Variable): FunctionTerm
-
-  def substa(a: Atomic, s: Subst) = Atomic(a.rel, a.args.map(_.subst(s)))
-
-  def subst(c: Conjunction, s: Subst): Conjunction = {
-    Conjunction(c.ai.map(substa(_, s)))
-  }
-
-  def subst(d: Disjunction, s: Subst): Disjunction = {
-    Disjunction(d.ei.map {
-      case Atomic(rel, terms) => Atomic(rel, terms.map(_.subst(s)))
-      case And(ai) => And(ai.map(substa(_, s)))
-      case e => Exists(e.xi, subst(e.c, s))
-    })
-  }
 
   def closed_instance(c: Conjunction): Conjunction = {
     val (s, params) = mksubst(freevars(c), Nil, parameter, Map())
@@ -137,11 +241,7 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
     assert(state.forall { a => wff(a.conclusion) } )
     assert(wff(d))
 
-    //println("consequence conjecture: " + d)
-
     def checkstate(state: List[Appeal]): Option[Appeal] = {
-      //println("checkstate facts: " + state)
-
       val base = derive1(d, state)
       if (!base.isEmpty) base
       else { // induction step
@@ -221,98 +321,11 @@ extends FormalSystem with ConjunctiveQuery[Atomic]{
     solve(c.ai, Map(), {() => state.toStream})
   }
 
-  
-  // TODO
-  def appeal_step_ok(x: Appeal, thms: List[Formula]): Boolean = false
-  override val methods = List[Symbol]()
-
-  override def rule(method: Symbol): Rule = {     // TODO
-    case (premises, conclusion) => false
+  def prove(goal: Formula): Option[Appeal] = {
+    val (s, params) = mksubst(freevars(goal.p), Nil, parameter, Map())
+    val cc = subst(goal.p, s)
+    consequence(cc.ai.map(Appeal('ASSUMPTION, _, Nil, Nil)),
+		subst(goal.q, s))
   }
-}
 
-/**
- * Definition 1: Coherent formula, disjunction, conjunction, implication.
- * TODO: allow Atomic where Conjunction goes, etc.
- */
-
-object Implication {
-  def apply(p: Conjunction, q: Disjunction): Implication = {
-    if (p.ai.isEmpty) q
-    else Implies(p, q)
-  }
-}
-
-sealed abstract class Implication {
-  def p: Conjunction
-  def q: Disjunction
-}
-case class Implies(val c: Conjunction,
-		   val d: Disjunction) extends Implication {
-  // use q rather than And() -> q
-  require (!p.ai.isEmpty)
-
-  // odd... doing this to avoid loop/stack overflow
-  def p = c
-  def q = d
-}
-
-object Disjunction {
-  def apply(ei: List[Existential]): Disjunction = {
-    if (ei.length == 1) ei(0)
-    else Or(ei)
-  }
-}
-
-sealed abstract class Disjunction extends Implication {
-  def p = And(Nil)
-  def q = this
-  def ei: List[Existential]
-}
-case class Or(val fmlas: List[Existential]) extends Disjunction {
-  // use f rather than Or(f)
-  require (ei.length != 1)
-  def ei = fmlas
-}
-
-object Existential {
-  def apply(xi: Set[Variable], c: Conjunction): Existential = {
-    if (xi.isEmpty) c
-    else Exists(xi, c)
-  }
-}
-
-sealed abstract class Existential extends Disjunction {
-  override def ei = List(this)
-  def xi: Set[Variable]
-  def c: Conjunction
-}
-case class Exists(val xi0: Set[Variable],
-		  val c0: Conjunction) extends Existential {
-  // use f rather than Exists(empty, f)
-  require (!xi.isEmpty)
-  def xi = xi0
-  def c = c0
-}
-
-object Conjunction {
-  def apply(ai: List[Atomic]): Conjunction = {
-    if (ai.length == 1) ai(0)
-    else And(ai)
-  }
-}
-abstract class Conjunction extends Existential {
-  override def xi: Set[Variable] = Set.empty
-  override def c = this
-  def ai: List[Atomic]
-}
-case class And(val ai0: List[Atomic]) extends Conjunction{
-  // use f rather than And(f)
-  require (ai.length != 1)
-  override def ai = ai0
-}
-
-case class Atomic(rel: Symbol, args: List[Term]) extends Conjunction
-   with AtomicParts{
-  override def ai = List(this)
 }

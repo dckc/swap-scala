@@ -1,92 +1,66 @@
 package org.w3.swap.rifxml
 
+import scala.xml
+
 import org.w3.swap
+import swap.rif.RIFBuilder
 
-/**
- * <a href="http://www.w3.org/TR/rif-bld/#Direct_Specification_of_RIF-BLD_Presentation_Syntax"
- * >2 Direct Specification of RIF-BLD Presentation Syntax</a>
- */
-trait RIFSyntax {
-  type Term
-  type BaseTerm <: Term
-  /**
-   * positional or named-argument term
-   */
-  type ArgTerm <: BaseTerm
-  type Const <: BaseTerm
-  type Var <: BaseTerm
-  type ArgNames
+abstract class RIFBLDXML extends RIFBuilder {
+  final val ns = "http://www.w3.org/2007/rif#"
 
-  /*
-  #  connective symbols And, Or, and :-
-  # quantifiers Exists and Forall
-  # the symbols =, #, ##, ->, External, Import, Prefix, and Base
-  # the symbols Group and Document
-  # the symbols for representing lists: List and OpenList.
-  # the auxiliary symbols (, ), [, ], <, >, and ^^ 
-  */
+  def rif_document(e: xml.Elem, base: String): Formula = {
+    if (!(e.label == "Document" && e.namespace == ns)){
+      throw new Exception("excpected rif:Document; got: " + e.label)
+    }
 
-  type PredicateSymbol <: Const
-  type FunctionSymbol <: Const
+    val imports = (e \ "directive" \ "import") map {
+      i => {
+	val profile = i \ "profile" match {
+	  case x if x.isEmpty => None
+	  case x => Some(x.text)
+	}
+	((i \ "location").text, profile)
+      }
+    }
 
-  type Formula
-  type ConditionFormula <: Formula
-  type ConjunctionOfAtoms <: ConditionFormula
-  type AtomicFormula <: ConjunctionOfAtoms
-  type RuleImplication <: Formula
+    // TODO: base
+    // TODO: prefixes
 
-  type Directive
-}
+    val payload = e \ "payload" \ "Group" match {
+      case g if g.isEmpty => None
+      case g => Some(group_elt(g))
+    }
+    document(None, Nil, imports, payload)
+  }
 
-trait RIFBuilder extends RIFSyntax {
-  def data(literal: String, symspace: String): Const
+  def group_elt(g: xml.NodeSeq): Formula = {
+    //@@assert(g.label == "Group")
 
-  def positional_term(fun: Const, args: Seq[BaseTerm]): ArgTerm
-  def named_arguments_term(t: Const, args: Map[ArgNames, BaseTerm]): ArgTerm
-  def closed_list(items: List[Term]): Term
-  def open_list(items: List[Term], tail: Term): Term
-  def external_term(t: ArgTerm): Term
+    val f = g \ "_" map {
+      case <sentence>
+            <Subclass>
+             <sub>{s @ _*}</sub>
+             <super>{t @ _*}</super>
+            </Subclass>
+           </sentence> => subclass_term(baseterm_elt(s), baseterm_elt(t))
 
-  def equality_term(t: BaseTerm, s: BaseTerm): AtomicFormula
-  def membership_term(t: BaseTerm, s: BaseTerm): AtomicFormula
-  def subclass_term(t: BaseTerm, s: BaseTerm): AtomicFormula
-  def frame_term(t: BaseTerm, args: Map[BaseTerm, BaseTerm]): AtomicFormula
+      case <sentence>
+            <Member>
+             <instance>{s @ _*}</instance>
+             <class>{t @ _*}</class>
+            </Member>
+           </sentence> => membership_term(baseterm_elt(s), baseterm_elt(t))
 
-  def atomic_formula(p: PredicateSymbol, args: Seq[BaseTerm]): AtomicFormula
-  def external_atomic(a: AtomicFormula): AtomicFormula
+    }
 
-  def conjunction(phi1n: Seq[ConditionFormula]): ConditionFormula
-  def disjunction(phi1n: Seq[ConditionFormula]): ConditionFormula
-  def existential(v1n: Set[Var], phi: ConditionFormula): ConditionFormula
+    group(f)
+  }
 
-  /**
-   * @param phi: none of the atomic formulas in phi is
-   *             an externally defined term
-   */
-  def implication(phi: ConjunctionOfAtoms,
-		  psi: ConditionFormula): RuleImplication
-
-  /**
-   * @param phi: constraint: freevars(phi) subset v1n
-   */
-  def universal_rule(v1n: Set[Var], phi: RuleImplication)
-
-  /**
-   * @param phi: constraint: freevars(phi) subset v1n
-   */
-  def universal_fact(v1n: Set[Var], phi: AtomicFormula)
-
-  /**
-   * If phi1, ..., phin are RIF-BLD rules, universal facts,
-   * variable-free rule implications, variable-free atomic formulas,
-   * or group formulas then Group(phi1 ... phin) is a group formula.
-   * As a special case, the empty group formula, Group(), is allowed
-   * and is treated as a tautology, i.e., a formula that is always true. 
-   */
-  def group(phi1n: Seq[Formula]): Formula
-
-  def document(base: Option[String],
-	       prefix_directives: Seq[(String, String)],
-	       import_directives: Seq[(String, Option[String])],
-	       directive1n: Seq[Directive], gamma: Option[Formula]): Formula
+  def baseterm_elt(e: xml.NodeSeq): BaseTerm = {
+    e \ "Const" match {
+      case x if x.isEmpty => throw new Exception("TODO: term: " + e)
+      case c =>
+	data((c \ "@type").text, c.text)
+    }
+  }
 }

@@ -11,11 +11,11 @@ import swap.logic1c.{Var, Constant, App, Quotable}
 import swap.sexp.{Atom, Cons, SExp}
 import SExp.fromSeq
 
-import swap.logic1cl.{CoherentLogic,
+import swap.logic1cl.{CoherentProver,
 		      Implication, Conjunction, Disjunction, Exists, Atomic,
 		    Implies, Or, And}
 
-class TestLogic(t: List[Implication]) extends CoherentLogic(t) {
+class TestProver(t: List[Implication]) extends CoherentProver(t) {
   var i = 0
 
   def fresh(pattern: Variable) = {
@@ -109,7 +109,7 @@ class CoherentLogicMisc extends Spec with ShouldMatchers {
 	
       val state = Set( app('Man, "socrates") )
       val conjecture = app('Mortal, "socrates")
-      val l = new TestLogic(theory)
+      val l = new TestProver(theory)
       val pfs = state.toList.map(l.Appeal('THEOREM, _, Nil, Nil))
       val pf = l.consequence(pfs, conjecture).get
       l.quotepf(l.linearize(pf)).toString() should equal (
@@ -132,7 +132,7 @@ class CoherentLogicMisc extends Spec with ShouldMatchers {
 	     Or(List(app('p),
 		     Exists(Set(Var('x)), app('q, 'x)) )) )
       val conjecture = app('p)
-      val l = new TestLogic(theory)
+      val l = new TestProver(theory)
       val pf = l.consequence(Nil, conjecture).get
       l.quotepf(l.linearize(pf)).toString() should equal (
 """((1 (exists (x ) (q x ) ) ASSUMPTION () () )
@@ -160,7 +160,7 @@ class CoherentLogicMisc extends Spec with ShouldMatchers {
       val state = Set( Atomic('Man, List("socrates")) )
       val conjecture = Atomic('Mortal, List("bob"))
 
-      //TestLogic.consequence_bf(theory, state, conjecture) should equal (false)
+      //TestProver.consequence_bf(theory, state, conjecture) should equal (false)
       false should equal (false)
     }
   }

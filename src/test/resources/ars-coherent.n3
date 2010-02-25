@@ -1,0 +1,22 @@
+# from section 4 A Small Case Study
+# of "Automating Coherent Logic"
+
+@keywords is, of, a.
+@forAll x, y, z.
+@prefix : <ars-coherent#>.
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+
+# 1. diamond property of r
+{ x r y. x r z } => { @forSome u. y r u. z r u }.
+# 2. re-elimination
+{ x re y } => {{ x r y } log:or { x e y }}.
+# 3. re, r-introduction
+{ x r y } => { x re y }.
+# 4. re, e-introduction
+{ x e y } => { x re y }.
+# 5. reflexivity of e
+x e x.
+# 6. symmetry of e
+{ x e y } => { y e x }.
+# 7. left re-congruence of e
+{ x e y. y re z } => { x re z }.

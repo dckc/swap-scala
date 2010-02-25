@@ -19,14 +19,31 @@ trait N3LogicTerms extends RDFGraphParts {
 trait N3TermBuilder extends N3LogicTerms {
 
   lazy val log_implies = uri("http://www.w3.org/2000/10/swap/log#implies")
+  lazy val log_or = uri("http://www.w3.org/2000/10/swap/log#or")
   lazy val rdf_type = uri(swap.rdf.Vocabulary.`type`)
+  lazy val owl_sameAs = uri("http://www.w3.org/2002/07/owl#sameAs")
 
-  def uri(i: String): Label
+  /**
+   * @forAll <xyz> makes <xyz> into a variable rather than a logical name.
+   */
+  def uri(i: String): Term
   def typed(lex: String, dt: String): Term
   def plain(lex: String, lang: Option[Symbol]): Term
 
-  def fresh(hint: String, universal: Boolean): V
-  def byName(name: Label, universal: Boolean): V
+  /**
+   * Existential variable in the current scope
+   */
+  def byName(name: String): V
+  def fresh(hint: String): V
+
+  /**
+   * Univerals variable in the outermost scope
+   */
+  def universal(name: String): V
+  /**
+   * Universal quanitifiation in the current scope.
+   */
+  def declare(name: String)
 
   def constant(value: Boolean): Literal
   def constant(value: Int): Literal
@@ -80,7 +97,10 @@ abstract class N3Syntax(val baseURI: String) extends N3Lex
 with N3TermBuilder with CheckedParser {
 
 
-  val namespaces = scala.collection.mutable.HashMap[String, String]()
+  // the default prefix is pre-declared a la @prefix : <#>.
+  val namespaces = scala.collection.mutable.HashMap[String, String](
+    "" -> combine(baseURI, "#")
+  )
   var keywords: Option[Set[Symbol]] = None
 
   def document: Parser[Unit] = rep(statement <~ ".") ^^ { case _ => () }
@@ -95,12 +115,12 @@ with N3TermBuilder with CheckedParser {
 		   | simplestatement
 		 )
 
-  def universal = "@forAll" ~> repsep(symbol, ",") <~ "." ^^ {
-    case symbols => symbols.foreach(byName(_, true))
+  def universal = "@forAll" ~> repsep(symbol, ",") ^^ {
+    case symbols => symbols.foreach(declare(_))
   }
 
-  val existential = "@forSome" ~> repsep(symbol, ",") <~ "." ^^ {
-    case symbols => symbols.foreach(byName(_, false))
+  val existential = "@forSome" ~> repsep(symbol, ",") ^^ {
+    case symbols => symbols.foreach(byName(_))
   }
 
   def declaration: Parser[Unit] = prefixDecl | keywordsDecl
@@ -112,6 +132,7 @@ with N3TermBuilder with CheckedParser {
   }
 
   def keywordsDecl: Parser[Unit] = "@keywords" ~> repsep(barename, ",") ^^ {
+    // TODO: check that the keywords are known.
     case words => keywords = Some(words.map(Symbol(_)).toSet)
   }
 
@@ -158,17 +179,21 @@ with N3TermBuilder with CheckedParser {
 
     // TODO: paths
   def term: Parser[Term] = (
-    symbol
+    symbol ^^ { case s => uri(s) }
+    | k('a) ^^ { case s => rdf_type }
+    | "=>" ^^ { case s => log_implies }
+    | "=" ^^ { case s => owl_sameAs }
+
     | literal
     | "[" ~> propertylist <~ "]" ^^ {
       case props => {
-	val v = fresh("something", false)
+	val v = fresh("something")
 	mkprops(v, props)
 	v
       }
     }
-    | evar ^^ { case name => byName(uri(combine(baseURI, name)), false) }
-    | uvar ^^ { case name => byName(uri(combine(baseURI, name)), true) }
+    | evar ^^ { case name => byName(combine(baseURI, "#" + name)) }
+    | uvar ^^ { case name => universal(combine(baseURI, "#" + name)) }
     | ("{" ^^ { case open => pushScope() }) ~> formulacontent <~ "}" ^^ {
       case fmlas => popScope()
     }
@@ -179,23 +204,18 @@ with N3TermBuilder with CheckedParser {
 
     /* TODO: test whether  'a' allowed in the object spot in n3/turtle.
      * How about as a datatype? */
-  def symbol: Parser[Label] = (
-    uriref ^^ { case ref => uri(combine(baseURI, ref)) }
-
-    | "a" ^^ { case s => rdf_type }
-    | "=>" ^^ {
-      case s => log_implies }
-    | "=" ^^ { case s => uri("http://www.w3.org/2002/07/owl#sameAs") }
+  def symbol: Parser[String] = (
+    uriref ^^ { case ref => combine(baseURI, ref) }
 
     | checked(qname) { case (q, in) => (
       if (namespaces.isDefinedAt(q._1)) Success(q, in)
       else Error("no such prefix: " + q._1, in)
-    ) } ^^ { case (p, l) => uri(namespaces(p) + l) }
+    ) } ^^ { case (p, l) => namespaces(p) + l }
 
     | checked(localname_re.r) { case (n, in) => (
       if (!keywords.isEmpty) Success(n, in)
       else Failure("not a symbol: " + n, in)
-    ) } ^^ { case n => uri(combine(baseURI, n)) }
+    ) } ^^ { case n => namespaces("") + n }
   )
 
   def literal: Parser[Term] = (

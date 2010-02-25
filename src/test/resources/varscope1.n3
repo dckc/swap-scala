@@ -1,0 +1,7 @@
+@prefix : <evarscope1#>.
+@keywords is, of, a.
+
+bob likes _:somebody.
+fred likes _:somebody.
+{ alice likes ?X } => { ?X likes _:somebody }.
+alice likes trina.
