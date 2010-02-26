@@ -72,6 +72,21 @@ class Scope {
   }
 }
 
+object Datatypes {
+  import swap.rdf.Vocabulary.{integer, double, decimal, boolean}
+  import swap.n3.Numeral
+
+  def value(lex: String, dt: String): Term = {
+    dt match {
+      case `integer` => IntT(Numeral.toInt(lex))
+      case `decimal` => DecimalT(Numeral.toDecimal(lex))
+      case `double` => DoubleT(lex.toDouble)
+      // TODO: boolean... others?
+      case _ => App('data, List(StringT(lex), Name(dt)))
+    }
+  }
+}
+
 /**
  * TODO: this FormulaAsTerm stuff is kinda nutso... get rid of it somehow?
  */
@@ -202,8 +217,9 @@ trait N3TheoryBuilder extends N3TermBuilder  {
   override def constant(value: Int) = IntT(value)
   override def constant(value: Double) = DoubleT(value)
   override def constant(value: BigDecimal) = DecimalT(value)
+
   override def typed(lex: String, dt: String) = {
-    App('data, List(StringT(lex), Name(dt)))
+    Datatypes.value(lex, dt)
   }
   override def plain(lex: String, lang: Option[Symbol]) = {
     lang match {
@@ -277,8 +293,10 @@ trait N3RIF extends RIFBuilder {
   type RuleImplication = Implication
   type Rule = Implication
 
-  override def data(lex: String, dt: String) = {
-    App('data, List(StringT(lex), Name(dt)))
+  override def data(lex: String, symspace: String): BaseTerm = {
+    import swap.rif.Vocabulary.iri
+
+    if (symspace == iri) Name(lex) else Datatypes.value(lex, symspace)
   }
 
   override def positional_term(fun: FunctionSymbol,
@@ -373,7 +391,7 @@ trait N3RIF extends RIFBuilder {
 			prefix_directives: Seq[(String, String)],
 			import_directives: Seq[(String, Option[String])],
 			gamma: Option[Formula]): Formula = {
-    val baseaddr = base getOrElse "data:"
+    val baseaddr = base getOrElse "data:,dummy-base"
     val web = new swap.webdata.BaseOpener(baseaddr)
 
     val import_theory: Iterable[Formula] = import_directives flatMap {
@@ -398,4 +416,4 @@ trait N3RIF extends RIFBuilder {
 
 }
 
-class RIFParser extends RIFBLDXML with N3RIF
+object RIFParser extends RIFBLDXML with N3RIF

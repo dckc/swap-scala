@@ -98,3 +98,8 @@ trait RIFBuilder extends RIFTypes {
 
 // TODO: 2.4 Annotations
 // TODO: 2.5 well-formedness
+
+object Vocabulary {
+  final val ns = "http://www.w3.org/2007/rif#"
+  final val iri = ns + "iri"
+}

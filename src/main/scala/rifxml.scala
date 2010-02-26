@@ -4,16 +4,16 @@ import scala.xml
 
 import org.w3.swap
 import swap.rif.RIFBuilder
+import swap.rif.Vocabulary.ns
 
 abstract class RIFBLDXML extends RIFBuilder {
-  final val ns = "http://www.w3.org/2007/rif#"
 
   def rif_document(e: xml.Elem, base: String): Formula = {
     if (!(e.label == "Document" && e.namespace == ns)){
       throw new Exception("excpected rif:Document; got: " + e.label)
     }
 
-    val imports = (e \ "directive" \ "import") map {
+    val imports = (e \ "directive" \ "Import") map {
       i => {
 	val profile = i \ "profile" match {
 	  case x if x.isEmpty => None
@@ -37,30 +37,25 @@ abstract class RIFBLDXML extends RIFBuilder {
     //@@assert(g.label == "Group")
 
     val f = g \ "_" map {
-      case <sentence>
-            <Subclass>
-             <sub>{s @ _*}</sub>
-             <super>{t @ _*}</super>
-            </Subclass>
-           </sentence> => subclass_term(baseterm_elt(s), baseterm_elt(t))
+      case <sentence>{_}<Subclass>{ ts @ _*}</Subclass>{_}</sentence> =>
+	subclass_term(baseterm_elt(ts \\ "sub"),
+		      baseterm_elt(ts \\ "super"))
 
-      case <sentence>
-            <Member>
-             <instance>{s @ _*}</instance>
-             <class>{t @ _*}</class>
-            </Member>
-           </sentence> => membership_term(baseterm_elt(s), baseterm_elt(t))
+      case <sentence>{_}<Member>{ ts @ _*}</Member>{_}</sentence> =>
+	membership_term(baseterm_elt(ts \\ "instance"),
+			baseterm_elt(ts \\ "class"))
 
+      // TODO: other...
     }
 
     group(f)
   }
 
   def baseterm_elt(e: xml.NodeSeq): BaseTerm = {
-    e \ "Const" match {
+    e \\ "Const" match {
       case x if x.isEmpty => throw new Exception("TODO: term: " + e)
       case c =>
-	data((c \ "@type").text, c.text)
+	data(c.text, (c \ "@type").text)
     }
   }
 }

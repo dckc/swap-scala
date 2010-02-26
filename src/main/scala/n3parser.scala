@@ -240,17 +240,23 @@ with N3TermBuilder with CheckedParser {
   
   def numeral: Parser[Literal] = (
     double ^^ {
-      case numeral => constant(java.lang.Double.parseDouble(numeral))
+      case numeral => constant(numeral.toDouble)
     }
     | decimal ^^ {
-      case numeral => constant(new BigDecimal(numeral)) }
+      case numeral => constant(Numeral.toDecimal(numeral)) }
     | integer ^^ {
-      case numeral => {
-	val n = if (numeral.startsWith("+")) numeral.substring(1) else numeral
-	constant(java.lang.Integer.parseInt(n))
-      }
+      case numeral => constant(Numeral.toInt(numeral))
     }
   )
+}
+
+object Numeral {
+  def toInt(numeral: String) = {
+    val n = if (numeral.startsWith("+")) numeral.substring(1) else numeral
+    java.lang.Integer.parseInt(n)
+  }
+
+  def toDecimal(s: String) = new BigDecimal(s)
 }
 
 class N3Lex extends swap.turtle.TurtleLex {
