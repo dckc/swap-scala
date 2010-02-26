@@ -66,7 +66,9 @@ class Scope {
   }
 
   def fresh(name: String, u: Boolean): Var = {
-    Var("tag:public-cwm-talk@w3.org,e", varstack.size, u)
+    val v = Var("tag:public-cwm-talk@w3.org,e", varstack.size, u)
+    varstack.push(v)
+    v
   }
 }
 

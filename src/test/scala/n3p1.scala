@@ -73,7 +73,10 @@ class N3ParseMisc extends Spec with ShouldMatchers {
       parsedoc(n3p, "{ <#x> <#p> <#y> } => { <#x> <#p> [] } .") should equal (
 	"""(implies
   (holds (data:#x ) (data:#p ) (data:#y ) )
-  (holds (data:#x ) (data:#p ) _:tag:public-cwm-talk@w3.org,e0 )
+  (exists
+    (_:tag:public-cwm-talk@w3.org,e0 )
+    (holds (data:#x ) (data:#p ) _:tag:public-cwm-talk@w3.org,e0 )
+    )
   )"""
       )
     }
@@ -90,7 +93,10 @@ class N3ParseMisc extends Spec with ShouldMatchers {
     (holds (data:#x ) (data:#p ) (data:#y ) )
     (holds (data:#bob ) (data:#knows ) (data:#joe ) )
     )
-  (holds (data:#x ) (data:#p ) _:tag:public-cwm-talk@w3.org,e0 )
+  (exists
+    (_:tag:public-cwm-talk@w3.org,e0 )
+    (holds (data:#x ) (data:#p ) _:tag:public-cwm-talk@w3.org,e0 )
+    )
   )"""
       )
     }
@@ -153,6 +159,23 @@ d e _:c.
   (and
     (holds (data:#a ) (data:#b ) _:data:#c0 )
     (holds (data:#d ) (data:#e ) _:data:#c0 )
+    )
+  )"""
+      )
+    }
+
+    it("should make a fresh existential variable for each [] phrase.") {
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, """
+<#pat> <#child> [ <#age> 4 ] , [ <#age> 3 ].
+""") should equal (
+"""(exists
+  (_:tag:public-cwm-talk@w3.org,e1 _:tag:public-cwm-talk@w3.org,e0 )
+  (and
+    (holds _:tag:public-cwm-talk@w3.org,e0 (data:#age ) 4 )
+    (holds _:tag:public-cwm-talk@w3.org,e1 (data:#age ) 3 )
+    (holds (data:#pat ) (data:#child ) _:tag:public-cwm-talk@w3.org,e0 )
+    (holds (data:#pat ) (data:#child ) _:tag:public-cwm-talk@w3.org,e1 )
     )
   )"""
       )
