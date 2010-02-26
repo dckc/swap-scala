@@ -1,0 +1,46 @@
+# first, some context:
+
+@prefix foo: <data:foo#>.
+@base <http://www.w3.org/2000/10/swap/Primer>.
+
+# Text from the N3 primer, generated a la:
+#
+# scala> val primerdoc = xml.XML.load("http://www.w3.org/2000/10/swap/Primer")
+# scala> ((primerdoc \\ "pre") map (_.text)).mkString("\n")
+
+
+<#pat> <#knows> <#jo> .
+<#pat> <#knows> <#jo> .
+<#pat> <#age> 24 .
+<#pat> <#child> <#al> .
+<#pat> has <#child> <#al> .
+<#al> is <#child> of <#pat> .
+<#pat> <#child>  <#al>, <#chaz>, <#mo> ;
+       <#age>    24 ;
+       <#eyecolor> "blue" .
+  <#pat>   <#age> 24;  <#eyecolor> "blue" .
+  <#al>    <#age>  3;  <#eyecolor> "green" .
+  <#jo>    <#age>  5;  <#eyecolor> "green" .
+<#pat> <#child> [ <#age> 4 ] , [ <#age> 3 ].
+  [ <#name> "Pat"; <#age> 24;  <#eyecolor> "blue"  ].
+  [ <#name> "Al" ; <#age>  3;  <#eyecolor> "green" ].
+  [ <#name> "Jo" ; <#age>  5;  <#eyecolor> "green" ].
+<> <#title>  "A simple example of N3".
+<> <http://purl.org/dc/elements/1.1/title>
+ "Primer - Getting into the Semantic Web and RDF using N3".
+@prefix dc:  <http://purl.org/dc/elements/1.1/> .
+<> dc:title
+  "Primer - Getting into the Semantic Web and RDF using N3".
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix : <#> .
+:pat :child [ :age 4 ] , [ :age 3 ].
+:Person a rdfs:Class.
+:Pat a :Person.
+:Woman a rdfs:Class; rdfs:subClassOf :Person .
+:sister a rdf:Property.
+:sister rdfs:domain :Person; 
+        rdfs:range :Woman.
+:Woman = foo:FemaleAdult .
+:Title a rdf:Property; = dc:title .

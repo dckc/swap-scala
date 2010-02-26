@@ -1,6 +1,6 @@
 package org.w3.swap.webdata
 
-import java.io.InputStreamReader
+import java.io.{InputStream, InputStreamReader}
 import java.net.URLConnection
 import scala.xml.XML
 import scala.util.parsing.combinator.Parsers
@@ -110,11 +110,24 @@ object WebData extends TermNode {
 abstract class URLOpener {
   def abs(ref: String): String
 
+  def textStream(conn: URLConnection): InputStreamReader = {
+    // TODO: check content encoding
+    // TODO: handle charset
+    new InputStreamReader(conn.getInputStream())
+  }
+
+  def openRaw(addr: String, accept: String): InputStream = {
+    val conn = new java.net.URL(addr).openConnection()
+    conn.setRequestProperty("accept", accept)
+    conn.getInputStream()
+  }
+
+  /* TODO: consider renaming this to openText, returning just the content
+   * type rather than the whole URLConnection */
   def open(addr: String, accept: String): (InputStreamReader, URLConnection) = {
     val conn = new java.net.URL(addr).openConnection()
     conn.setRequestProperty("accept", accept)
-    val reader = new InputStreamReader(conn.getInputStream())
-    (reader, conn)
+    (textStream(conn), conn)
   }
 
   def open_any(addr: String): InputStreamReader = open(addr, "*/*")._1

@@ -101,6 +101,27 @@ class N3ParseMisc extends Spec with ShouldMatchers {
       )
     }
 
+    it("should grok pre-declared keywords.") {
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, """<#pat> has <#child> <#al> .""") should equal (
+	"""(holds (data:#pat ) (data:#child ) (data:#al ) )"""
+      )
+    }
+
+
+    it("should grok bare names once @keywords are declared.") {
+      val n3p = new N3Parser("data:")
+      parsedoc(n3p, """
+@keywords is, of, a.
+@prefix : <xyz#>.
+
+pat knows joe.
+""") should equal (
+	"""(holds (data:xyz#pat ) (data:xyz#knows ) (data:xyz#joe ) )"""
+      )
+    }
+
+
     it("should handle nested formulas.") {
       val n3p = new N3Parser("data:")
       parsedoc(n3p, """
@@ -119,18 +140,6 @@ class N3ParseMisc extends Spec with ShouldMatchers {
   )""")
     }
 
-    it("should grok @keywords.") {
-      val n3p = new N3Parser("data:")
-      parsedoc(n3p, """
-@keywords is, of, a.
-@prefix : <xyz#>.
-
-pat knows joe.
-""") should equal (
-	"""(holds (data:xyz#pat ) (data:xyz#knows ) (data:xyz#joe ) )"""
-      )
-    }
-
     it("should grok multiple delcarations in a row.") {
       val n3p = new N3Parser("data:")
       parsedoc(n3p, """
@@ -141,7 +150,11 @@ pat knows joe.
 
 fido a Dog.
 """) should equal (
-	"""(holds (data:refi_ex#fido ) (data:refi_ex#a ) (data:refi_ex#Dog ) )"""
+"""(holds
+  (data:refi_ex#fido )
+  (http://www.w3.org/1999/02/22-rdf-syntax-ns#type )
+  (data:refi_ex#Dog )
+  )"""
       )
     }
 
@@ -151,14 +164,14 @@ fido a Dog.
       parsedoc(n3p, """
 @keywords is, of, a.
 
-a b _:c.
-d e _:c.
+x b _:c.
+y e _:c.
 """) should equal (
 """(exists
   (_:data:#c0 )
   (and
-    (holds (data:#a ) (data:#b ) _:data:#c0 )
-    (holds (data:#d ) (data:#e ) _:data:#c0 )
+    (holds (data:#x ) (data:#b ) _:data:#c0 )
+    (holds (data:#y ) (data:#e ) _:data:#c0 )
     )
   )"""
       )
@@ -185,8 +198,28 @@ d e _:c.
   }
 }
 
+class N3PrimerTest extends Spec with ShouldMatchers {
+  import scala.io.Source
+  import WebAccess.loadN3
+
+  describe("N3 Parser") {
+    val web = ResourceOpener
+    val theory = loadN3(web, "jar:/primer.n3")
+    val logic = new TestN3Logic(theory)
+    val stream = web.openRaw("jar:/primer.sexp", "*,*")
+    assert(stream != null)
+    val sexp = Source.fromInputStream(stream).mkString("")
+
+    it("should parse all the examples from the N3 Primer"){
+      theory.map(logic.quote(_).pretty()).mkString("\n") should equal (
+	sexp )
+    }
+  }
+}
+
 class N3ProoveMisc extends Spec with ShouldMatchers {
   import swap.webdata
+  import WebAccess.loadN3
 
   describe("N3Logic on Small Case Study in section 4 of the paper") {
     val web = ResourceOpener
@@ -359,6 +392,9 @@ class N3ProoveMisc extends Spec with ShouldMatchers {
     }
   }
 
+}
+
+object WebAccess {
   def loadN3(web: swap.webdata.URLOpener, path: String): List[Implication] = {
     val addr = web.abs(path)
     val p = new N3Parser(addr)
@@ -371,18 +407,24 @@ class N3ProoveMisc extends Spec with ShouldMatchers {
       }
     }
   }
-
 }
 
 /**
  * Opener for jar resources
+ * TODO: umm... this might be mis-using the jar: URI scheme
  */
 object ResourceOpener extends swap.webdata.URLOpener {
-  import java.io.InputStreamReader
+  import java.io.{InputStream, InputStreamReader}
 
   def abs(ref: String): String = {
     assert(ref.startsWith("jar:/"))
     ref
+  }
+
+  override def openRaw(addr: String, accept: String): InputStream = {
+    assert(addr.startsWith("jar:/"))
+    val path = addr.substring(4)
+    this.getClass.getResourceAsStream(path)
   }
 
   override def open_any(addr: String): InputStreamReader = {

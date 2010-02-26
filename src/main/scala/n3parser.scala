@@ -93,7 +93,7 @@ trait N3TermBuilder extends N3LogicTerms {
  * 
  * @author <a href="http://www.w3.org/People/Connolly/">Dan Connolly</a>
  */
-abstract class N3Syntax(val baseURI: String) extends N3Lex
+abstract class N3Syntax(var baseURI: String) extends N3Lex
 with N3TermBuilder with CheckedParser {
 
 
@@ -101,7 +101,8 @@ with N3TermBuilder with CheckedParser {
   val namespaces = scala.collection.mutable.HashMap[String, String](
     "" -> combine(baseURI, "#")
   )
-  var keywords: Option[Set[Symbol]] = None
+  var keywords = Set('a, 'is, 'of, 'has)
+  var keywords_declared = false
 
   def document: Parser[Unit] = rep(statement <~ ".") ^^ { case _ => () }
 
@@ -123,18 +124,24 @@ with N3TermBuilder with CheckedParser {
     case symbols => symbols.foreach(byName(_))
   }
 
-  def declaration: Parser[Unit] = prefixDecl | keywordsDecl
-
-  def prefixDecl: Parser[Unit] = "@prefix" ~> prefixOptColon ~ uriref ^^ {
-    case prefix ~ ref => {
-      namespaces.put(prefix, combine(baseURI, ref))
+  def declaration: Parser[Unit] = (
+    k('base) ~> uriref ^^ {
+      case ref => baseURI = combine(baseURI, ref)
+      ()
     }
-  }
-
-  def keywordsDecl: Parser[Unit] = "@keywords" ~> repsep(barename, ",") ^^ {
-    // TODO: check that the keywords are known.
-    case words => keywords = Some(words.map(Symbol(_)).toSet)
-  }
+    | k('prefix) ~> prefixOptColon ~ uriref ^^ {
+      case prefix ~ ref => namespaces.put(prefix, combine(baseURI, ref))
+      ()
+    }
+    | k('keywords) ~> repsep(barename, ",") ^^ {
+      // TODO: check that the keywords are known.
+      case words => {
+	keywords = words.map(Symbol(_)).toSet
+	keywords_declared = true
+	()
+      }
+    }
+  )
 
   def mkprops(t1: Term, props: List[(Term, Term, Boolean)]) = {
     for(prop <- props) {
@@ -157,33 +164,33 @@ with N3TermBuilder with CheckedParser {
     
 
   def k(sym: Symbol): Parser[Symbol] = (
-    ("@" + localname_re).r ^^ { case kw => Symbol(kw.substring(1)) }
+    ("@" + sym.name) ^^ { case kw => Symbol(kw.substring(1)) }
     | checked(sym.name ^^ { case s => sym }) {
       case (s, in) => (
-	if (keywords.getOrElse(Set.empty) contains sym) Success(sym, in)
-	else Failure("barename not keyword", in)
-	)
+	if (keywords contains sym) Success(sym, in)
+	else Failure("keyword neither decalred nor prefixed by @: " + sym.name,
+		     in)
+      )
     }
   )
 
-  def property: Parser[List[(Term, Term, Boolean)]] = (
-    // TODO: with keywords, this becomes @has
-    opt(k('has)) ~> term ~ repsep(term, ",") ^^ {
-      case t2 ~ tn => tn.map(ti => (t2, ti, false))
+  def property: Parser[List[(Term, Term, Boolean)]] =
+    verb ~ repsep(term, ",") ^^ {
+      case (v, reversed) ~ o1n => o1n.map(oi => (v, oi, reversed))
     }
 
-    | k('is) ~> term ~ k('of) ~ repsep(term, ",") ^^ {
-      case t2 ~ x ~ tn => tn.map(ti => (t2, ti, true))
-    }
+  def verb: Parser[(Term,  Boolean)] = (
+      "<=" ^^ { case _ => (log_implies, true) }
+    | "=>" ^^ { case _ => (log_implies, false) }
+    | "=" ^^ { case _ => (owl_sameAs, false) }
+    | opt(k('has)) ~> term ^^ { case t => (t, false) }
+    | k('a) ^^ { case _ => (rdf_type, false) }
+    | k('is) ~> term <~ k('of) ^^ { case t => (t, true) }
   )
 
     // TODO: paths
   def term: Parser[Term] = (
     symbol ^^ { case s => uri(s) }
-    | k('a) ^^ { case s => rdf_type }
-    | "=>" ^^ { case s => log_implies }
-    | "=" ^^ { case s => owl_sameAs }
-
     | literal
     | "[" ~> propertylist <~ "]" ^^ {
       case props => {
@@ -213,8 +220,11 @@ with N3TermBuilder with CheckedParser {
     ) } ^^ { case (p, l) => namespaces(p) + l }
 
     | checked(localname_re.r) { case (n, in) => (
-      if (!keywords.isEmpty) Success(n, in)
-      else Failure("not a symbol: " + n, in)
+      if (keywords_declared) {
+	if (!(keywords contains Symbol(n))) Success(n, in)
+	else Failure("keyword found where symbol expected: " + n, in)
+      }
+      else Failure("barename found before @keywords declared: " + n, in)
     ) } ^^ { case n => namespaces("") + n }
   )
 
@@ -223,10 +233,8 @@ with N3TermBuilder with CheckedParser {
     | quotedStringAtLanguage  ^^ {
       case (s, lang) => plain(s, lang) }
     | numeral
-    | boolean ^^ {
-      case "true" => constant(true)
-      case "fase" => constant(false)
-    }
+    | k('true) ^^ { case _ => constant(true) }
+    | k('false) ^^ { case _ => constant(true) }
   )
 
   
